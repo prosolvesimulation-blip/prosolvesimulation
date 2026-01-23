@@ -1,0 +1,16 @@
+{% for item in commands %}
+{{ item.result_name }} = AFFE_CHAR_MECA(
+    MODELE={{ item.model_name }},
+    PESANTEUR=_F(
+        GRAVITE={{ item.gravite }},
+        DIRECTION={{ item.direction }},
+        {%- if item.group_ma %}
+        GROUP_MA='{{ item.group_ma }}',
+        {%- endif %}
+    ),
+    DOUBLE_LAGRANGE='{{ item.double_lagrange }}',
+    INFO={{ item.info }},
+    VERI_AFFE='{{ item.veri_affe }}',
+    VERI_NORM='{{ item.veri_norm }}',
+);
+{% endfor %}

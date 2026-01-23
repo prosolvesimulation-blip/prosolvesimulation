@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProSolve Studio v2.1 - HDF5 Official</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="module">
+        import h5wasm from "https://cdn.jsdelivr.net/npm/h5wasm@0.8.11/dist/esm/hdf5_hl.js";
+
+        async function startH5() {
+            try {
+                const Module = await h5wasm.ready;
+                window.h5wasm = h5wasm;
+                window.h5FS = Module.FS;
+                console.log("Motor HDF5/WASM v0.8.11 pronto!");
+                window.dispatchEvent(new CustomEvent('h5-ready'));
+            } catch (err) {
+                console.error("Falha fatal no motor:", err);
+            }
+        }
+        startH5();
+    </script>
+
+    <style>
+        body,
+        #root {
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .tab-active {
+            border-bottom: 3px solid #2563eb;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import AsterButton from './AsterButton.js?v=2';
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [activeMainTab, setActiveMainTab] = useState('MESH');
+            const [nodeGroupsMap, setNodeGroupsMap] = useState({});
+            const [loadedFiles, setLoadedFiles] = useState([]);
+            const [systemReady, setSystemReady] = useState(false);
+            const [processing, setProcessing] = useState(false);
+            const [restrictions, setRestrictions] = useState([]);
+            const [loads, setLoads] = useState([]);
+            const [loadCases, setLoadCases] = useState([]);
+            const [verificationData, setVerificationData] = useState(null);
+            const [geometries, setGeometries] = useState([]);
+
+            // Helper para garantir nome único
+            const getUniqueName = (baseName, currentList) => {
+                let name = baseName;
+                let counter = 1;
+                const existingNames = currentList.map(r => r.name.toLowerCase());
+                while (existingNames.includes(name.toLowerCase())) {
+                    name = `${baseName}_${counter}`;
+                    counter++;
+                }
+                return name;
+            };
+
+            useEffect(() => {
+                const handleReady = () => setSystemReady(true);
+                window.addEventListener('h5-ready', handleReady);
+                if (window.h5wasm) setSystemReady(true);
+                return () => window.removeEventListener('h5-ready', handleReady);
+            }, []);
+
+            useEffect(() => {
+                if (activeMainTab === 'VERIFICATION') {
+                    fetchResults();
+                }
+            }, [activeMainTab]);
+
+            const fetchResults = () => {
+                fetch('/output/properties.csv')
+                    .then(res => {
+                        if (!res.ok) throw new Error("Resultados não encontrados");
+                        return res.text();
+                    })
+                    .then(text => {
+                        setVerificationData(parseAsterCSV(text));
+                    })
+                    .catch(err => {
+                        console.warn("Aviso:", err.message);
+                        setVerificationData(null);
+                    });
+            };
+
+            const parseAsterCSV = (text) => {
+                const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== "");
+                let tables = {};
+                let currentTable = null;
+                let headers = [];
+
+                lines.forEach(line => {
+                    if (line.startsWith('##')) {
+                        currentTable = line.replace('##', '').trim();
+                        tables[currentTable] = [];
+                        headers = [];
+                    } else if (line.startsWith('#')) {
+                        // Ignorar comentários
+                    } else if (currentTable) {
+                        // Split by comma if present, else by multiple spaces
+                        let cols = [];
+                        if (line.includes(',')) {
+                            cols = line.split(',').map(c => c.trim()).filter(c => c !== "");
+                        } else {
+                            cols = line.split(/\s{2,}/).map(c => c.trim()).filter(c => c !== "");
+                        }
+
+                        if (cols.length === 0) return;
+
+                        if (headers.length === 0) {
+                            headers = cols;
+                        } else {
+                            let row = {};
+                            headers.forEach((h, i) => {
+                                row[h] = cols[i] || "-";
+                            });
+                            tables[currentTable].push(row);
+                        }
+                    }
+                });
+                return tables;
+            };
+
+            // Listener para Colagem (Excel) com Validação de Nome Único
+            useEffect(() => {
+                const handlePaste = (e) => {
+                    if (activeMainTab !== 'RESTRICTIONS') return;
+
+                    const pasteData = e.clipboardData.getData('text');
+                    const rows = pasteData.split(/\r?\n/).filter(row => row.trim() !== "");
+                    if (rows.length === 0) return;
+
+                    setRestrictions(prev => {
+                        let updatedList = [...prev];
+                        rows.forEach(row => {
+                            const cols = row.split('\t');
+                            if (cols.length < 3) return;
+
+                            const [mesh, name, group, type, dx, dy, dz, mx, my, mz] = cols;
+                            const availableGroups = nodeGroupsMap[mesh.trim()];
+
+                            if (availableGroups) {
+                                const foundGroup = availableGroups.find(g => g.name === group.trim());
+                                if (foundGroup) {
+                                    const finalName = getUniqueName(name.trim() || 'Pasted_Condition', updatedList);
+                                    updatedList.push({
+                                        id: Date.now() + Math.random(),
+                                        file: mesh.trim(),
+                                        name: finalName,
+                                        group: foundGroup.name,
+                                        type: foundGroup.type,
+                                        dx: dx || '0', dy: dy || '0', dz: dz || '0',
+                                        mx: mx || 'Free', my: my || 'Free', mz: mz || 'Free'
+                                    });
+                                }
+                            }
+                        });
+                        return updatedList;
+                    });
+                };
+
+                window.addEventListener('paste', handlePaste);
+                return () => window.removeEventListener('paste', handlePaste);
+            }, [nodeGroupsMap, activeMainTab]);
+
+            const handleFileUpload = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0 || !systemReady) return;
+
+                setProcessing(true);
+                const h5 = window.h5wasm;
+                const FS = window.h5FS;
+
+                const newNodeGroupsMap = { ...nodeGroupsMap };
+                const newLoadedFiles = [...loadedFiles];
+                const incomingRestrictions = [];
+                const incomingGeometries = [];
+
+                for (const file of files) {
+                    if (newLoadedFiles.includes(file.name)) continue;
+
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        try { FS.unlink(file.name); } catch (err) { }
+                        FS.writeFile(file.name, new Uint8Array(arrayBuffer));
+
+                        const f = new h5.File(file.name, "r");
+                        const foundGroups = [];
+
+                        if (f.keys().includes("FAS")) {
+                            const fas = f.get("FAS");
+                            const rootKey = fas.keys()[0];
+                            const root = fas.get(rootKey);
+                            const parseFamKey = (key) => key.split('_').length >= 3 ? key.split('_').slice(2).join('_') : key;
+
+                            ["NOEUD", "ELEME"].forEach(typeKey => {
+                                if (root.keys().includes(typeKey)) {
+                                    root.get(typeKey).keys().forEach(k => {
+                                        if (k.startsWith("FAM")) {
+                                            foundGroups.push({
+                                                name: parseFamKey(k),
+                                                type: typeKey === "NOEUD" ? "Node" : "Element"
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        const uniqueGroups = foundGroups.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+
+                        if (uniqueGroups.length > 0) {
+                            newNodeGroupsMap[file.name] = uniqueGroups;
+                            newLoadedFiles.push(file.name);
+
+                            uniqueGroups.forEach((groupObj) => {
+                                incomingRestrictions.push({
+                                    file: file.name,
+                                    baseName: `Cond_${groupObj.name}`,
+                                    group: groupObj.name,
+                                    type: groupObj.type,
+                                    dx: '0', dy: '0', dz: '0', mx: 'Free', my: 'Free', mz: 'Free'
+                                });
+
+                                if (groupObj.type === "Element") {
+                                    incomingGeometries.push({
+                                        id: Date.now() + Math.random(),
+                                        file: file.name,
+                                        group: groupObj.name,
+                                        type: 'Solid', // Default
+                                        thickness: 1.0,
+                                        section: 'Rectangle',
+                                        hy: 1.0, hz: 1.0, r: 1.0,
+                                        formulation: 'DKT',
+                                        offset: 0.0,
+                                        vx: 1.0, vy: 0.0, vz: 0.0
+                                    });
+                                }
+                            });
+
+                            // --- MED Investigation (Re-implemented) ---
+                            try {
+                                const investigateMedFile = (h5File) => {
+                                    const analysisReport = {};
+                                    // 1. Identify Mesh Name (Root of FAS) -- Module H5G/H5O
+                                    if (!h5File.keys().includes("FAS")) return;
+                                    const fas = h5File.get("FAS");
+                                    const meshName = fas.keys()[0];
+                                    const fasRoot = fas.get(meshName);
+
+                                    // 2. Map Family ID (NUM) -> Family Name -- Module H5A (Attributes)
+                                    const familyIdMap = new Map();
+
+                                    const processFamGroup = (famNode, nodeName) => {
+                                        let famId = -1;
+                                        // accessing attributes via .attrs (H5A)
+                                        try {
+                                            // h5wasm: .attrs is a Proxy/Map-like object. 
+                                            // .attrs["NUM"] returns the attribute object. .value gets the content.
+                                            if (famNode.attrs && famNode.attrs["NUM"]) {
+                                                const numAttr = famNode.attrs["NUM"];
+                                                famId = numAttr.value[0];
+                                            }
+                                        } catch (e) { }
+
+                                        if (famId === -1) {
+                                            // Fallback: Parsing Key
+                                            const parts = nodeName.split('_');
+                                            if (parts.length >= 2 && !isNaN(parseInt(parts[1]))) {
+                                                famId = parseInt(parts[1]);
+                                            }
+                                        }
+
+                                        let famName = nodeName;
+                                        if (nodeName.split('_').length >= 3) {
+                                            famName = nodeName.split('_').slice(2).join('_');
+                                        }
+
+                                        if (famId !== -1) {
+                                            familyIdMap.set(famId, famName);
+                                        }
+                                    };
+
+                                    if (fasRoot.keys().includes("ELEME")) {
+                                        const elemeGroup = fasRoot.get("ELEME");
+                                        elemeGroup.keys().forEach(k => {
+                                            if (k.startsWith("FAM")) processFamGroup(elemeGroup.get(k), k);
+                                        });
+                                    }
+
+                                    // 3. Scan Mesh Elements -- Module H5G (Groups) & H5D (Datasets)
+                                    let meshRoot = null;
+                                    if (h5File.keys().includes("ENS_MAA")) meshRoot = h5File.get("ENS_MAA").get(meshName);
+                                    else if (h5File.keys().includes("MAILLAGE")) meshRoot = h5File.get("MAILLAGE").get(meshName);
+
+                                    if (meshRoot) {
+                                        meshRoot.keys().forEach(elemType => {
+                                            const typeNode = meshRoot.get(elemType);
+                                            // We need to access the 'FAM' dataset inside the element group
+                                            if (typeNode && typeNode.keys && typeNode.keys().includes("FAM")) {
+                                                // H5D: Accessing Dataset
+                                                const famDataset = typeNode.get("FAM");
+                                                // H5D: Reading Data (.value returns typed array)
+                                                const famIds = famDataset.value;
+
+                                                const uniqueIds = [...new Set(famIds)];
+                                                uniqueIds.forEach(id => {
+                                                    if (id === 0) return;
+                                                    const name = familyIdMap.get(id);
+                                                    if (name) {
+                                                        if (!analysisReport[name]) analysisReport[name] = [];
+                                                        if (!analysisReport[name].includes(elemType)) {
+                                                            analysisReport[name].push(elemType);
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        });
+                                    }
+
+                                    console.log(`%c[MED Analysis] ${file.name}`, 'color: #3b82f6; font-weight: bold;');
+                                    console.table(analysisReport);
+                                    // Also Log plain object for easy copying
+                                    console.log("Analysis Result Object:", analysisReport);
+                                };
+
+                                investigateMedFile(f);
+                            } catch (err) {
+                                console.warn("MED Investigation failed:", err);
+                            }
+                            // --- End Investigation ---
+                        }
+                        f.close();
+                    } catch (err) {
+                        console.error(`Erro no arquivo ${file.name}:`, err);
+                    }
+                }
+
+                setNodeGroupsMap(newNodeGroupsMap);
+                setLoadedFiles(newLoadedFiles);
+
+                setRestrictions(prev => {
+                    let updated = [...prev];
+                    incomingRestrictions.forEach(item => {
+                        const uniqueName = getUniqueName(item.baseName, updated);
+                        updated.push({
+                            id: Date.now() + Math.random(),
+                            ...item,
+                            name: uniqueName
+                        });
+                    });
+                    return updated;
+                });
+
+                setGeometries(prev => [...prev, ...incomingGeometries]);
+                setProcessing(false);
+            };
+
+            const updateGeometry = (id, field, value) => {
+                setGeometries(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
+            };
+
+            const clearAllGeometries = () => {
+                if (confirm("Deseja realmente limpar todas as configurações de geometria?")) {
+                    setGeometries([]);
+                }
+            };
+
+            const updateRow = (id, field, value) => {
+                if (field === 'name') {
+                    const exists = restrictions.some(r => r.id !== id && r.name.toLowerCase() === value.trim().toLowerCase());
+                    if (exists) {
+                        alert("Este 'Condition Name' já está em uso! Escolha um nome exclusivo.");
+                        return;
+                    }
+                }
+                setRestrictions(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+            };
+
+            const removeRow = (id) => setRestrictions(restrictions.filter(r => r.id !== id));
+
+            const clearAll = () => {
+                if (confirm("Limpar todas as condições?")) setRestrictions([]);
+            };
+
+            const duplicateRow = (row) => {
+                setRestrictions(prev => {
+                    const uniqueName = getUniqueName(`${row.name}_copy`, prev);
+                    const newRow = { ...row, id: Date.now() + Math.random(), name: uniqueName };
+                    const index = prev.findIndex(r => r.id === row.id);
+                    const updated = [...prev];
+                    updated.splice(index + 1, 0, newRow);
+                    return updated;
+                });
+            };
+
+            const handleGroupChange = (rowId, fileName, newGroupName) => {
+                const groupInfo = nodeGroupsMap[fileName].find(g => g.name === newGroupName);
+                setRestrictions(restrictions.map(r =>
+                    r.id === rowId ? { ...r, group: newGroupName, type: groupInfo ? groupInfo.type : r.type } : r
+                ));
+            };
+
+            // Load helper functions
+            const addLoad = () => {
+                const baseName = 'Load_1';
+                const uniqueName = getUniqueName(baseName, loads);
+                setLoads(prev => [...prev, {
+                    id: Date.now() + Math.random(),
+                    name: uniqueName,
+                    group_ma: '',
+                    gravite: 9.81,
+                    dirX: 0,
+                    dirY: 0,
+                    dirZ: -1
+                }]);
+            };
+
+            const updateLoad = (id, field, value) => {
+                if (field === 'name') {
+                    const exists = loads.some(l => l.id !== id && l.name.toLowerCase() === value.trim().toLowerCase());
+                    if (exists) {
+                        alert("Este nome já está em uso!");
+                        return;
+                    }
+                }
+                setLoads(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+            };
+
+            const removeLoad = (id) => setLoads(loads.filter(l => l.id !== id));
+
+            const duplicateLoad = (load) => {
+                setLoads(prev => {
+                    const uniqueName = getUniqueName(`${load.name}_copy`, prev);
+                    const newLoad = { ...load, id: Date.now() + Math.random(), name: uniqueName };
+                    const index = prev.findIndex(l => l.id === load.id);
+                    const updated = [...prev];
+                    updated.splice(index + 1, 0, newLoad);
+                    return updated;
+                });
+            };
+
+            const clearAllLoads = () => {
+                if (confirm("Limpar todas as cargas?")) setLoads([]);
+            };
+
+            // Load Case helper functions
+            const addLoadCase = () => {
+                const baseName = 'LC1';
+                const uniqueName = getUniqueName(baseName, loadCases);
+                setLoadCases(prev => [...prev, {
+                    id: Date.now() + Math.random(),
+                    name: uniqueName,
+                    items: []
+                }]);
+            };
+
+            const updateLoadCase = (id, field, value) => {
+                if (field === 'name') {
+                    const exists = loadCases.some(lc => lc.id !== id && lc.name.toLowerCase() === value.trim().toLowerCase());
+                    if (exists) {
+                        alert("Este nome já está em uso!");
+                        return;
+                    }
+                }
+                setLoadCases(prev => prev.map(lc => lc.id === id ? { ...lc, [field]: value } : lc));
+            };
+
+            const removeLoadCase = (id) => setLoadCases(loadCases.filter(lc => lc.id !== id));
+
+            const toggleLoadCaseItem = (lcId, itemName) => {
+                setLoadCases(prev => prev.map(lc => {
+                    if (lc.id !== lcId) return lc;
+                    const items = lc.items.includes(itemName)
+                        ? lc.items.filter(name => name !== itemName)
+                        : [...lc.items, itemName];
+                    return { ...lc, items };
+                }));
+            };
+
+            // handleRunCodeAster removed (moved to AsterButton.js)
+
+            return (
+                <div className="flex flex-col h-screen">
+                    {!systemReady && (
+                        <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                            <div className="text-4xl animate-spin mb-4">⚙️</div>
+                            <div className="font-bold">Carregando Binários HDF5...</div>
+                        </div>
+                    )}
+
+                    <header className="bg-slate-800 text-white p-4 flex justify-between items-center shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-600 p-1.5 rounded-lg">🚀</div>
+                            <h1 className="font-bold tracking-tight">ProSolve Studio <span className="text-blue-400">v2.1</span></h1>
+                        </div>
+                        <div className="text-[10px] bg-slate-700 px-3 py-1 rounded-full uppercase font-medium">
+                            {loadedFiles.length > 0 ? `${loadedFiles.length} Malhas Ativas` : 'Sem arquivos'}
+                        </div>
+                    </header>
+
+                    <nav className="bg-white border-b flex justify-center gap-8 shadow-sm">
+                        {['MESH', 'GEOMETRY', 'RESTRICTIONS', 'LOAD', 'LOAD CASES', 'VERIFICATION'].map(tab => (
+                            <button key={tab} onClick={() => setActiveMainTab(tab)}
+                                className={`py-4 px-4 text-xs font-bold transition-all ${activeMainTab === tab ? 'tab-active' : 'text-slate-400 hover:text-slate-600'}`}>
+                                {tab}
+                            </button>
+                        ))}
+                    </nav>
+
+                    <main className="flex-grow p-6 flex flex-col items-center overflow-auto bg-slate-50">
+
+
+                        {activeMainTab === 'MESH' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex gap-4 items-stretch">
+                                    <label className="drop-zone flex-grow flex flex-col items-center justify-center py-8 rounded-xl bg-white shadow-sm border-slate-200">
+                                        <span className="text-3xl mb-2">{processing ? '⏳' : '📥'}</span>
+                                        <span className="text-xs font-semibold text-slate-500">
+                                            {processing ? 'ANALISANDO HDF5...' : 'CLIQUE PARA CARREGAR .MED'}
+                                        </span>
+                                        <input type="file" className="hidden" onChange={handleFileUpload} accept=".med" multiple />
+                                    </label>
+                                </div>
+
+                                {Object.keys(nodeGroupsMap).length > 0 ? (
+                                    <div className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+                                                    <th className="p-3 text-left font-semibold">Source Mesh</th>
+                                                    <th className="p-3 text-left font-semibold">Group Name</th>
+                                                    <th className="p-3 text-center font-semibold">Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {Object.entries(nodeGroupsMap).flatMap(([filename, groups]) =>
+                                                    groups.map((g, idx) => (
+                                                        <tr key={`${filename}-${g.name}-${idx}`} className="hover:bg-blue-50/50 transition-colors group">
+                                                            <td className="p-3 text-[10px] font-mono text-slate-500">{filename}</td>
+                                                            <td className="p-3">
+                                                                <span className="block w-full border border-slate-200 p-1.5 rounded text-xs bg-slate-50 text-slate-700 font-medium">
+                                                                    {g.name}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 text-center">
+                                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${g.type === 'Node' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                                    {(g.type || '').toUpperCase()}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">📊</div>
+                                        <h3 className="text-slate-500 font-medium">Nenhuma condição ativa</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Carregue um arquivo .MED ou utilize o comando Ctrl+V para colar do Excel.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+
+
+
+
+                        {activeMainTab === 'RESTRICTIONS' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex gap-4 items-stretch">
+                                    <label className="drop-zone flex-grow flex flex-col items-center justify-center py-8 rounded-xl bg-white shadow-sm border-slate-200">
+                                        <span className="text-3xl mb-2">{processing ? '⏳' : '📥'}</span>
+                                        <span className="text-xs font-semibold text-slate-500">
+                                            {processing ? 'ANALISANDO HDF5...' : 'CLIQUE PARA CARREGAR .MED'}
+                                        </span>
+                                        <input type="file" className="hidden" onChange={handleFileUpload} accept=".med" multiple />
+                                    </label>
+
+                                    <div className="flex flex-col gap-3 justify-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-72">
+                                        <div className="flex items-start gap-2 text-[10px] text-slate-600">
+                                            <span className="text-blue-500 font-bold">⚠️</span>
+                                            <p><strong>Nomes Duplicados:</strong> O sistema renomeia automaticamente entradas repetidas para garantir unicidade.</p>
+                                        </div>
+                                        <button onClick={clearAll} className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] py-2 px-3 rounded-lg font-bold border border-rose-200 transition-colors uppercase">
+                                            Limpar Todas Condições
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {restrictions.length > 0 ? (
+                                    <div className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+                                                    <th className="p-3 text-left font-semibold">Source Mesh</th>
+                                                    <th className="p-3 text-left font-semibold">Condition Name</th>
+                                                    <th className="p-3 text-left font-semibold">Group</th>
+                                                    <th className="p-3 text-center font-semibold">Type</th>
+                                                    {['DX', 'DY', 'DZ', 'MX', 'MY', 'MZ'].map(h => <th key={h} className="p-3 text-center font-semibold">{h}</th>)}
+                                                    <th className="p-3 text-center font-semibold">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {restrictions.map(r => (
+                                                    <tr key={r.id} className="hover:bg-blue-50/50 transition-colors group">
+                                                        <td className="p-3 text-[10px] font-mono text-slate-500">{r.file}</td>
+                                                        <td className="p-3">
+                                                            <input
+                                                                className="w-full border-slate-200 border p-1.5 rounded text-xs focus:ring-2 focus:ring-blue-400 outline-none font-medium"
+                                                                value={r.name}
+                                                                onBlur={(e) => updateRow(r.id, 'name', e.target.value)}
+                                                                onChange={(e) => {
+                                                                    // Apenas feedback visual rápido, a trava real está no onBlur ou Submit
+                                                                    const newList = restrictions.map(row => row.id === r.id ? { ...row, name: e.target.value } : row);
+                                                                    setRestrictions(newList);
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <select
+                                                                className="w-full border-slate-200 border p-1.5 rounded text-xs bg-slate-50 cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
+                                                                value={r.group}
+                                                                onChange={(e) => handleGroupChange(r.id, r.file, e.target.value)}
+                                                            >
+                                                                {(nodeGroupsMap[r.file] || []).map(g => (
+                                                                    <option key={g.name} value={g.name}>{g.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${r.type === 'Node' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                                {(r.type || '').toUpperCase()}
+                                                            </span>
+                                                        </td>
+                                                        {['dx', 'dy', 'dz', 'mx', 'my', 'mz'].map(col => (
+                                                            <td key={col} className="p-3 text-center">
+                                                                <input
+                                                                    className="w-14 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                    value={r[col]}
+                                                                    onChange={(e) => updateRow(r.id, col, e.target.value)}
+                                                                />
+                                                            </td>
+                                                        ))}
+                                                        <td className="p-3 text-center">
+                                                            <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => duplicateRow(r)} className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors" title="Duplicar">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+                                                                </button>
+                                                                <button onClick={() => removeRow(r.id)} className="p-1.5 hover:bg-rose-100 text-rose-600 rounded transition-colors" title="Remover">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">📊</div>
+                                        <h3 className="text-slate-500 font-medium">Nenhuma condição ativa</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Carregue um arquivo .MED ou utilize o comando Ctrl+V para colar do Excel.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+
+
+
+
+                        {activeMainTab === 'GEOMETRY' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex gap-4 items-stretch">
+                                    <label className="drop-zone flex-grow flex flex-col items-center justify-center py-8 rounded-xl bg-white shadow-sm border-slate-200">
+                                        <span className="text-3xl mb-2">{processing ? '⏳' : '📥'}</span>
+                                        <span className="text-xs font-semibold text-slate-500">
+                                            {processing ? 'ANALISANDO HDF5...' : 'CLIQUE PARA CARREGAR .MED'}
+                                        </span>
+                                        <input type="file" className="hidden" onChange={handleFileUpload} accept=".med" multiple />
+                                    </label>
+
+                                    <div className="flex flex-col gap-3 justify-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-72">
+                                        <div className="flex items-start gap-2 text-[10px] text-slate-600">
+                                            <span className="text-blue-500 font-bold">⚠️</span>
+                                            <p><strong>Configuração Geométrica:</strong> Defina o tipo de modelo (Casca, Viga ou Sólido) para cada grupo de elementos.</p>
+                                        </div>
+                                        <button onClick={clearAllGeometries} className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] py-2 px-3 rounded-lg font-bold border border-rose-200 transition-colors uppercase">
+                                            Limpar Todas Geometrias
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {geometries.length > 0 ? (
+                                    <div className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+                                                    <th className="p-3 text-left font-semibold">Source Mesh</th>
+                                                    <th className="p-3 text-left font-semibold">Group</th>
+                                                    <th className="p-3 text-center font-semibold">Model Type</th>
+                                                    <th className="p-3 text-center font-semibold">Formulation</th>
+                                                    <th className="p-3 text-left font-semibold">Properties</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {geometries.map(g => (
+                                                    <tr key={g.id} className="hover:bg-blue-50/50 transition-colors group">
+                                                        <td className="p-3 text-[10px] font-mono text-slate-500">{g.file}</td>
+                                                        <td className="p-3">
+                                                            <span className="block w-full border border-slate-200 p-1.5 rounded text-xs bg-slate-50 text-slate-700 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                                                                {g.group}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <select
+                                                                className="border-slate-200 border p-1 rounded text-xs bg-white cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none font-semibold"
+                                                                value={g.type}
+                                                                onChange={(e) => updateGeometry(g.id, 'type', e.target.value)}
+                                                            >
+                                                                <option value="Solid">Solid (3D)</option>
+                                                                <option value="Shell">Shell (DKT)</option>
+                                                                <option value="Beam">Beam (POU_D_T)</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            {g.type === 'Shell' ? (
+                                                                <select
+                                                                    className="border-slate-200 border p-1 rounded text-xs bg-white cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none font-semibold w-24"
+                                                                    value={g.formulation}
+                                                                    onChange={(e) => updateGeometry(g.id, 'formulation', e.target.value)}
+                                                                >
+                                                                    <option value="DKT">DKT</option>
+                                                                    <option value="DST">DST</option>
+                                                                    <option value="COQUE_3D">3D</option>
+                                                                </select>
+                                                            ) : (
+                                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                                    {g.type === 'Beam' ? 'POU_D_T' : '3D'}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {g.type === 'Shell' && (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] text-slate-500 uppercase font-bold w-16">Thickness:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            className="w-16 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                            value={g.thickness}
+                                                                            onChange={(e) => updateGeometry(g.id, 'thickness', parseFloat(e.target.value) || 0)}
+                                                                        />
+                                                                        <span className="text-[10px] text-slate-400">mm</span>
+
+                                                                        <span className="text-[10px] text-slate-500 uppercase font-bold ml-4 w-12">Offset:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            className="w-16 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                            value={g.offset}
+                                                                            onChange={(e) => updateGeometry(g.id, 'offset', parseFloat(e.target.value) || 0)}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] text-slate-500 uppercase font-bold w-16">Vector V:</span>
+                                                                        <div className="flex gap-1">
+                                                                            <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-[10px]" value={g.vx} onChange={(e) => updateGeometry(g.id, 'vx', parseFloat(e.target.value) || 0)} />
+                                                                            <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-[10px]" value={g.vy} onChange={(e) => updateGeometry(g.id, 'vy', parseFloat(e.target.value) || 0)} />
+                                                                            <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-[10px]" value={g.vz} onChange={(e) => updateGeometry(g.id, 'vz', parseFloat(e.target.value) || 0)} />
+                                                                        </div>
+                                                                        <span className="text-[9px] text-slate-400 italic">(Orientation)</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {g.type === 'Beam' && (
+                                                                <div className="flex items-center gap-3">
+                                                                    <select
+                                                                        className="border-slate-200 border p-1 rounded text-[10px] bg-white cursor-pointer font-bold"
+                                                                        value={g.section}
+                                                                        onChange={(e) => updateGeometry(g.id, 'section', e.target.value)}
+                                                                    >
+                                                                        <option value="Rectangle">Rectangle</option>
+                                                                        <option value="Circle">Circle</option>
+                                                                    </select>
+                                                                    {g.section === 'Rectangle' ? (
+                                                                        <div className="flex gap-2">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-[9px] text-slate-400">HY:</span>
+                                                                                <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-xs" value={g.hy} onChange={(e) => updateGeometry(g.id, 'hy', parseFloat(e.target.value))} />
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-[9px] text-slate-400">HZ:</span>
+                                                                                <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-xs" value={g.hz} onChange={(e) => updateGeometry(g.id, 'hz', parseFloat(e.target.value))} />
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[9px] text-slate-400">R:</span>
+                                                                            <input type="number" className="w-12 border-slate-200 border p-0.5 rounded text-center text-xs" value={g.r} onChange={(e) => updateGeometry(g.id, 'r', parseFloat(e.target.value))} />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {g.type === 'Solid' && (
+                                                                <span className="text-[10px] text-slate-400 italic">No extra properties required</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">📐</div>
+                                        <h3 className="text-slate-500 font-medium">Nenhuma geometria definida</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Carregue um arquivo .MED para configurar as propriedades dos elementos.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+
+
+                        {activeMainTab === 'LOAD' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex gap-4 items-stretch">
+                                    <button onClick={addLoad} className="drop-zone flex-grow flex flex-col items-center justify-center py-8 rounded-xl bg-white shadow-sm border-slate-200 hover:bg-blue-50 transition-colors">
+                                        <span className="text-3xl mb-2">➕</span>
+                                        <span className="text-xs font-semibold text-slate-500">ADD ACCELERATION LOAD</span>
+                                    </button>
+
+                                    <div className="flex flex-col gap-3 justify-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-72">
+                                        <div className="flex items-start gap-2 text-[10px] text-slate-600">
+                                            <span className="text-blue-500 font-bold">💡</span>
+                                            <p><strong>Dica:</strong> Para gravidade apontando para baixo, use direção (0, 0, -1) com 9.81 m/s².</p>
+                                        </div>
+                                        <button onClick={clearAllLoads} className="bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] py-2 px-3 rounded-lg font-bold border border-rose-200 transition-colors uppercase">
+                                            Limpar Todas Cargas
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {loads.length > 0 ? (
+                                    <div className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+                                                    <th className="p-3 text-left font-semibold">Load Name</th>
+                                                    <th className="p-3 text-left font-semibold">Group (Element)</th>
+                                                    <th className="p-3 text-center font-semibold">Magnitude</th>
+                                                    <th className="p-3 text-center font-semibold">Dir X</th>
+                                                    <th className="p-3 text-center font-semibold">Dir Y</th>
+                                                    <th className="p-3 text-center font-semibold">Dir Z</th>
+                                                    <th className="p-3 text-center font-semibold">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {loads.map(l => (
+                                                    <tr key={l.id} className="hover:bg-blue-50/50 transition-colors group">
+                                                        <td className="p-3">
+                                                            <input
+                                                                className="w-full border-slate-200 border p-1.5 rounded text-xs focus:ring-2 focus:ring-blue-400 outline-none font-medium"
+                                                                value={l.name}
+                                                                onBlur={(e) => updateLoad(l.id, 'name', e.target.value)}
+                                                                onChange={(e) => setLoads(loads.map(row => row.id === l.id ? { ...row, name: e.target.value } : row))}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <select
+                                                                className="w-full border-slate-200 border p-1.5 rounded text-xs bg-slate-50 cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
+                                                                value={l.group_ma}
+                                                                onChange={(e) => updateLoad(l.id, 'group_ma', e.target.value)}
+                                                            >
+                                                                <option value="">-- Select --</option>
+                                                                {Object.values(nodeGroupsMap).flat().filter(g => g.type === 'Element').map(g => (
+                                                                    <option key={g.name} value={g.name}>{g.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number" step="0.01"
+                                                                className="w-16 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                value={l.gravite}
+                                                                onChange={(e) => updateLoad(l.id, 'gravite', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number" step="0.1"
+                                                                className="w-14 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                value={l.dirX}
+                                                                onChange={(e) => updateLoad(l.id, 'dirX', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number" step="0.1"
+                                                                className="w-14 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                value={l.dirY}
+                                                                onChange={(e) => updateLoad(l.id, 'dirY', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number" step="0.1"
+                                                                className="w-14 border-slate-200 border p-1 rounded text-center text-xs focus:border-blue-400 outline-none"
+                                                                value={l.dirZ}
+                                                                onChange={(e) => updateLoad(l.id, 'dirZ', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => duplicateLoad(l)} className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors" title="Duplicar">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+                                                                </button>
+                                                                <button onClick={() => removeLoad(l.id)} className="p-1.5 hover:bg-rose-100 text-rose-600 rounded transition-colors" title="Remover">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">🏋️</div>
+                                        <h3 className="text-slate-500 font-medium">Nenhuma carga ativa</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Clique em "Add Acceleration Load" para adicionar.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeMainTab === 'LOAD CASES' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex gap-4 items-stretch">
+                                    <button onClick={addLoadCase} className="drop-zone flex-grow flex flex-col items-center justify-center py-8 rounded-xl bg-white shadow-sm border-slate-200 hover:bg-blue-50 transition-colors">
+                                        <span className="text-3xl mb-2">📂</span>
+                                        <span className="text-xs font-semibold text-slate-500">ADD LOAD CASE (LC)</span>
+                                    </button>
+                                </div>
+
+                                {loadCases.length > 0 ? (
+                                    <div className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-sm border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-800 text-slate-200 text-[11px] uppercase tracking-wider">
+                                                    <th className="p-3 text-left font-semibold w-1/4">LC Name</th>
+                                                    <th className="p-3 text-left font-semibold">Included Items (Restrictions & Loads)</th>
+                                                    <th className="p-3 text-center font-semibold w-24">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {loadCases.map(lc => (
+                                                    <tr key={lc.id} className="hover:bg-blue-50/50 transition-colors group">
+                                                        <td className="p-3 align-top">
+                                                            <input
+                                                                className="w-full border-slate-200 border p-1.5 rounded text-xs focus:ring-2 focus:ring-blue-400 outline-none font-bold"
+                                                                value={lc.name}
+                                                                onBlur={(e) => updateLoadCase(lc.id, 'name', e.target.value)}
+                                                                onChange={(e) => setLoadCases(loadCases.map(row => row.id === lc.id ? { ...row, name: e.target.value } : row))}
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {[...new Set([...restrictions.map(r => r.name), ...loads.map(l => l.name)])].map(itemName => (
+                                                                    <button
+                                                                        key={itemName}
+                                                                        onClick={() => toggleLoadCaseItem(lc.id, itemName)}
+                                                                        className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${lc.items.includes(itemName)
+                                                                            ? 'bg-blue-600 text-white border-blue-600'
+                                                                            : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400 hover:text-blue-400'
+                                                                            }`}
+                                                                    >
+                                                                        {itemName}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            {restrictions.length === 0 && loads.length === 0 && (
+                                                                <span className="text-[10px] text-slate-400 italic">No restrictions or loads defined.</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-center align-top">
+                                                            <button onClick={() => removeLoadCase(lc.id)} className="p-1.5 hover:bg-rose-100 text-rose-600 rounded transition-colors" title="Remover">
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">📂</div>
+                                        <h3 className="text-slate-500 font-medium">Nenhum Load Case ativo</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Clique em "Add Load Case" para começar.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeMainTab === 'VERIFICATION' && (
+                            <div className="w-full max-w-7xl animate-in fade-in duration-500">
+                                <div className="mb-6 flex justify-between items-center">
+                                    <h2 className="text-xl font-bold text-slate-700">Relatório de Verificação</h2>
+                                    <button
+                                        onClick={fetchResults}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-lg shadow transition-all flex items-center gap-2"
+                                    >
+                                        <span>🔄</span> Atualizar Resultados
+                                    </button>
+                                </div>
+                                {verificationData ? (
+                                    <div className="flex flex-col gap-8">
+                                        {Object.entries(verificationData).map(([tableName, rows]) => (
+                                            <div key={tableName} className="bg-white shadow-xl border border-slate-200 rounded-xl overflow-hidden">
+                                                <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
+                                                    <h3 className="text-sm font-bold uppercase tracking-wider">{tableName}</h3>
+                                                    <span className="text-[10px] bg-blue-600 px-2 py-0.5 rounded">{rows.length} Registros</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wider">
+                                                                {rows.length > 0 && Object.keys(rows[0]).map(h => (
+                                                                    <th key={h} className="p-3 text-left font-bold border-b">{h}</th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {rows.map((row, idx) => (
+                                                                <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
+                                                                    {Object.values(row).map((val, i) => (
+                                                                        <td key={i} className="p-3 text-[11px] font-mono whitespace-nowrap">
+                                                                            {val}
+                                                                        </td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-24 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-inner">
+                                        <div className="text-5xl mb-4 grayscale opacity-20">📊</div>
+                                        <h3 className="text-slate-500 font-medium">Resultados não disponíveis</h3>
+                                        <p className="text-slate-400 text-xs mt-1">Execute o Code_Aster para gerar os dados de verificação.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <AsterButton
+                            restrictions={restrictions}
+                            loadedFiles={loadedFiles}
+                            loads={loads}
+                            loadCases={loadCases}
+                            geometries={geometries}
+                        />
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>

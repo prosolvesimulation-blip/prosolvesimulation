@@ -1,0 +1,14 @@
+{
+    "pesanteur": [
+        {
+            "gravite": 9.81,
+            "direction": [
+                0,
+                0,
+                -1
+            ],
+            "group_ma": "12mm",
+            "name": "Load_1"
+        }
+    ]
+}

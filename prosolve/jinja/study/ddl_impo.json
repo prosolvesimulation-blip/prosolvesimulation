@@ -1,0 +1,16 @@
+{
+    "ddl_impo": [
+        {
+            "name": "Cond_fixed",
+            "group": "fixed",
+            "params": {
+                "DX": 0,
+                "DY": 0,
+                "DZ": 0,
+                "DRX": 0,
+                "DRY": 0,
+                "DRZ": 0
+            }
+        }
+    ]
+}

@@ -1,0 +1,358 @@
+import { useState, useEffect } from 'react'
+import { ArrowLeft, FolderOpen, Save, Play } from 'lucide-react'
+import { motion } from 'framer-motion'
+import ModelConfig from './config/ModelConfig'
+import MaterialConfig from './config/MaterialConfig'
+import RestrictionConfig from './config/RestrictionConfig'
+import LoadConfig from './config/LoadConfig'
+import GeometryConfig from './config/GeometryConfig'
+import LoadCaseConfig from './config/LoadCaseConfig'
+import MeshConfig from './config/MeshConfig'
+import ThreeDModel from './config/ThreeDModel'
+
+interface StructuralWorkspaceProps {
+    onBack: () => void
+    projectPath: string | null
+    setProjectPath: (path: string | null) => void
+}
+
+type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'restrictions' | 'loads' | 'loadcases' | '3d-view'
+
+interface ProjectConfig {
+    geometries: any[]
+    materials: any[]
+    restrictions: any[]
+    loads: any[]
+    load_cases: any[]
+}
+
+export default function StructuralWorkspace({
+    onBack,
+    projectPath,
+    setProjectPath,
+}: StructuralWorkspaceProps) {
+    const [isLoading, setIsLoading] = useState(false)
+    const [activeTab, setActiveTab] = useState<Tab>('mesh')
+    const [projectConfig, setProjectConfig] = useState<ProjectConfig>({
+        geometries: [],
+        materials: [],
+        restrictions: [],
+        loads: [],
+        load_cases: []
+    })
+
+    // DEBUG LOG
+    useEffect(() => {
+        console.log("ROOT: projectConfig updated:", projectConfig)
+    }, [projectConfig])
+    const [availableGroups, setAvailableGroups] = useState<string[]>([])
+    const [meshFiles, setMeshFiles] = useState<string[]>([])
+    const [simulationRunning, setSimulationRunning] = useState(false)
+
+    const handleRunSimulation = async () => {
+        if (!projectPath) return
+        setSimulationRunning(true)
+        try {
+            // Auto save first? Maybe safer to ask user to save, but let's assume Save Project flow handles generation.
+            // We should ideally save first to ensure export is fresh.
+            await handleSaveProject()
+
+            const res = await fetch('/api/run_simulation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder_path: projectPath })
+            })
+            const data = await res.json()
+
+            if (data.status === 'success') {
+                alert('Simulation Completed!\nCheck "simulation_files/message" for details.')
+            } else {
+                alert('Simulation Failed:\n' + data.message)
+            }
+        } catch (error) {
+            console.error(error)
+            alert('Error running simulation')
+        } finally {
+            setSimulationRunning(false)
+        }
+    }
+
+    const handleSaveProject = async () => {
+        if (!projectPath) return
+        try {
+            // Basic notification (could be improved with toast)
+            console.log("Saving project...")
+
+            const response = await fetch('/api/save_project', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folder_path: projectPath,
+                    config: projectConfig
+                })
+            })
+            const data = await response.json()
+            if (data.status === 'success') {
+                alert("Project Saved & Generated Successfully!")
+            } else {
+                alert("Save Failed: " + data.message)
+            }
+        } catch (e) {
+            console.error(e)
+            alert("Error saving project")
+        }
+    }
+
+    const handleOpenFolder = async () => {
+        try {
+            setIsLoading(true)
+            const response = await fetch('/api/open_folder_dialog')
+            const data = await response.json()
+
+            if (data.status === 'success' && data.path) {
+                setProjectPath(data.path)
+
+                // Try load config, but start with empty if not found
+                setProjectConfig({
+                    geometries: [],
+                    materials: [],
+                    restrictions: [],
+                    loads: [],
+                    load_cases: []
+                })
+
+                const loadResp = await fetch('/api/open_project', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_path: data.path })
+                })
+                const loadData = await loadResp.json()
+                if (loadData.status === 'success' && loadData.config) {
+                    setProjectConfig(loadData.config)
+                }
+
+                // 2. Trigger Scan & Inspection
+                // This will generate mesh.json, export.export and RUN inspect_mesh.py -> mesh_groups.json
+                setIsLoading(true)
+                // We show loading while inspection runs (it might take a few seconds)
+                const scanResp = await fetch('/api/scan_workspace', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_path: data.path })
+                })
+                const scanData = await scanResp.json()
+
+                // 3. Read the generated groups (and list files from scanData)
+                if (scanData.status === 'success') {
+                    if (scanData.files && scanData.files.mesh) {
+                        setMeshFiles(scanData.files.mesh)
+                    } else {
+                        setMeshFiles([])
+                    }
+
+                    const groupsResp = await fetch('/api/read_mesh_groups', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ folder_path: data.path })
+                    })
+                    const groupsData = await groupsResp.json()
+
+                    if (groupsData.status === 'success' && groupsData.data && groupsData.data.groups) {
+                        setAvailableGroups(groupsData.data.groups)
+                    }
+                }
+
+            }
+        } catch (error) {
+            console.error('Failed to open folder:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const tabs = [
+        { id: 'mesh' as Tab, label: 'Mesh', icon: '🕸️' },
+        { id: 'model' as Tab, label: 'Model', icon: '🏗️' },
+        { id: 'geometry' as Tab, label: 'Geometry', icon: '📐' },
+        { id: '3d-view' as Tab, label: '3D View', icon: '🧊' },
+        { id: 'material' as Tab, label: 'Material', icon: '⚙️' },
+        { id: 'restrictions' as Tab, label: 'Restrictions', icon: '🔒' },
+        { id: 'loads' as Tab, label: 'Loads', icon: '⚡' },
+        { id: 'loadcases' as Tab, label: 'Load Cases', icon: '📊' }
+    ]
+
+    return (
+        <div className="h-full w-full flex flex-col bg-slate-900">
+            {/* Toolbar */}
+            <div className="h-14 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-3 shrink-0">
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onBack}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="text-sm font-medium">Back</span>
+                </motion.button>
+
+                <div className="h-8 w-px bg-slate-700" />
+
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleOpenFolder}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+                >
+                    <FolderOpen className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                        {isLoading ? 'Opening...' : 'Open Project'}
+                    </span>
+                </motion.button>
+
+                {projectPath && (
+                    <>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleSaveProject}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
+                        >
+                            <Save className="w-4 h-4" />
+                            <span className="text-sm font-medium">Save Project</span>
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleRunSimulation}
+                            disabled={simulationRunning}
+                            className={`flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors ${simulationRunning ? 'opacity-50' : ''}`}
+                        >
+                            <Play className="w-4 h-4" />
+                            <span className="text-sm font-medium">
+                                {simulationRunning ? 'Running...' : 'Run Simulation'}
+                            </span>
+                        </motion.button>
+                    </>
+                )}
+
+                {projectPath && (
+                    <div className="ml-auto text-sm text-slate-400 font-mono truncate max-w-md">
+                        {projectPath}
+                    </div>
+                )}
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {!projectPath ? (
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                        <FolderOpen className="w-24 h-24 text-slate-600 mb-6" />
+                        <h2 className="text-2xl font-semibold text-slate-400 mb-2">
+                            No Project Selected
+                        </h2>
+                        <p className="text-slate-500 text-center max-w-md">
+                            Click "Open Project" to select a folder containing your geometry
+                            and mesh files.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Tab Navigation */}
+                        <div className="w-48 bg-slate-800 border-r border-slate-700 p-4 space-y-2">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === tab.id
+                                        ? 'bg-blue-600 text-white shadow-lg'
+                                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                                        }`}
+                                >
+                                    <span className="text-xl">{tab.icon}</span>
+                                    <span className="font-medium text-sm">{tab.label}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        <div className="flex-1 overflow-hidden">
+                            {activeTab === 'model' && (
+                                <ModelConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    currentGeometries={projectConfig.geometries}
+                                    onUpdate={(geometries: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, geometries }))}
+                                />
+                            )}
+                            {activeTab === 'mesh' && (
+                                <MeshConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    meshes={meshFiles}
+                                />
+                            )}
+                            {activeTab === 'material' && (
+                                <MaterialConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    initialMaterials={projectConfig.materials}
+                                    onUpdate={(materials: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, materials }))}
+                                />
+                            )}
+
+                            {activeTab === 'geometry' && (
+                                <GeometryConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    availableGeometries={projectConfig.geometries}
+                                    onUpdate={(geometries: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, geometries }))}
+                                />
+                            )}
+
+                            {activeTab === '3d-view' && (
+                                <ThreeDModel
+                                    projectPath={projectPath}
+                                    geometries={projectConfig.geometries}
+                                    meshes={meshFiles}
+                                />
+                            )}
+
+                            {activeTab === 'restrictions' && (
+                                <RestrictionConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    availableGroups={availableGroups.length > 0 ? availableGroups : projectConfig.geometries.map((g: any) => g.group)}
+                                    initialRestrictions={projectConfig.restrictions}
+                                    onUpdate={(restrictions: any[]) => {
+                                        console.log("ROOT: Received update from Restrictions:", restrictions)
+                                        setProjectConfig((prev: ProjectConfig) => ({ ...prev, restrictions }))
+                                    }}
+                                />
+                            )}
+                            {activeTab === 'loads' && (
+                                <LoadConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    availableGroups={availableGroups.length > 0 ? availableGroups : projectConfig.geometries.map((g: any) => g.group)}
+                                    initialLoads={projectConfig.loads}
+                                    onUpdate={(loads: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, loads }))}
+                                />
+                            )}
+                            {activeTab === 'loadcases' && (
+                                <LoadCaseConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    availableLoads={projectConfig.loads}
+                                    initialLoadCases={projectConfig.load_cases}
+                                    onUpdate={(cases: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, load_cases: cases }))}
+                                />
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}

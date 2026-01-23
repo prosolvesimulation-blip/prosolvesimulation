@@ -1,0 +1,15 @@
+{{ result_name }} = AFFE_CHAR_MECA(
+    MODELE={{ model_name }},
+    FORCE_COQUE=(
+    {%- for item in load_items %}
+        _F(
+            GROUP_MA='{{ item.group }}',
+            # Usa o valor calculado no Python (press_lookup[nome][1])
+            {{ item.direction }}=press_lookup['{{ item.name }}'][1]
+        ),
+    {%- endfor %}
+    ),
+    DOUBLE_LAGRANGE='{{ double_lagrange }}',
+    INFO={{ info }},
+    VERI_AFFE='{{ veri_affe }}',
+);

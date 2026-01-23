@@ -1,0 +1,22 @@
+{# 
+    Lógica para N malhas:
+    O Code_Aster ASSE_MAILLAGE funciona melhor de forma binária (1+1).
+    Este loop pega a primeira malha física e vai 'superpondo' as demais
+    sequencialmente, acumulando tudo na variável definida em {{ result_name }}.
+#}
+
+{% set first_mesh = items[0].mesh %}
+
+{% for item in items[1:] %}
+
+{{ result_name }} = ASSE_MAILLAGE(
+    {# Se for a primeira iteração, une a Malha 0 com a Malha 1 #}
+    {# Nas próximas, une o Resultado Acumulado (MAIL) com a Malha Atual #}
+    MAILLAGE_1 = {% if loop.first %}{{ first_mesh }}{% else %}{{ result_name }}{% endif %},
+    
+    MAILLAGE_2 = {{ item.mesh }},
+    
+    OPERATION = 'SUPERPOSE',
+);
+
+{% endfor %}

@@ -1,0 +1,10 @@
+{
+    "direction": [
+        0,
+        0,
+        -1
+    ],
+    "gravity": 9.81,
+    "name": "PESANTEUR_1",
+    "type": "PESANTEUR"
+}

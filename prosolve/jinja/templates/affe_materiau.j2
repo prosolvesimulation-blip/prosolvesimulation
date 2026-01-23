@@ -1,0 +1,11 @@
+{{ result_name }} = AFFE_MATERIAU(
+    MODELE={{ model_name }},
+    AFFE=(
+    {%- for item in items %}
+        _F(
+            GROUP_MA=({{ "'" + item.groups|join("', '") + "'" }}),
+            MATER={{ item.mater }}
+        ),
+    {%- endfor %}
+    ),
+);

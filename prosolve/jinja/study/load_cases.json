@@ -1,0 +1,11 @@
+{
+    "load_cases": [
+        {
+            "name": "LC1",
+            "loads": [
+                "Cond_fixed",
+                "Load_1"
+            ]
+        }
+    ]
+}

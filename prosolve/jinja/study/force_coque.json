@@ -1,0 +1,10 @@
+{
+    "force_coque": [
+        {
+            "name": "wind_load",
+            "group": "12mm",
+            "total_force": 50000.0,
+            "direction": "FZ"
+        }
+    ]
+}

@@ -1,0 +1,99 @@
+# -----------------------------------------------------------------------------
+# 3. DIAGNOSTICO DETALHADO + EXPORTACAO JSON (INJETADO VIA JINJA)
+# -----------------------------------------------------------------------------
+import sys
+import json
+import os
+
+def imprimir_na_tela(texto):
+    """Forca a impressao no console"""
+    sys.stdout.write(texto + "\n")
+    sys.stdout.flush()
+
+# Cabecalho da tabela no terminal
+print("\n" + "="*90)
+print(f"{'NOME DO GRUPO':<30} | {'TOTAL':<8} | {'COMPOSICAO (TIPO:QTD)'}")
+print("="*90)
+
+# Dicionario que vai guardar os dados para o JSON
+dados_output = {
+    "source_mesh": "Code_Aster_Inspection",
+    "groups": {}
+}
+
+# 1. Pega lista de grupos da malha '{{ mesh_variable }}'
+lista_grupos = {{ mesh_variable }}.getGroupsOfCells()
+lista_grupos.sort()
+
+for g_nome in lista_grupos:
+    # 2. Pega IDs e quantidade
+    elementos_ids = {{ mesh_variable }}.getCells(g_nome)
+    total_elementos = len(elementos_ids)
+    
+    # 3. Conta tipos
+    contagem_tipos = {}
+    for elem_id in elementos_ids:
+        tipo = {{ mesh_variable }}.getCellTypeName(elem_id)
+        if tipo in contagem_tipos:
+            contagem_tipos[tipo] += 1
+        else:
+            contagem_tipos[tipo] = 1
+            
+    # 4. Formata para o terminal
+    lista_composicao = []
+    for tipo, qtd in contagem_tipos.items():
+        lista_composicao.append(f"{tipo}:{qtd}")
+    str_composicao = ", ".join(lista_composicao)
+    
+    print(f"{g_nome:<30} | {total_elementos:<8} | {str_composicao}")
+    
+    # 5. Guarda no dicionario
+    dados_output["groups"][g_nome] = {
+        "count": total_elementos,
+        "types": contagem_tipos
+    }
+
+# 6. Processamento de Grupos de NOS (Nodes)
+lista_grupos_nos = {{ mesh_variable }}.getGroupsOfNodes()
+lista_grupos_nos.sort()
+
+for g_nome in lista_grupos_nos:
+    # A API getNodes pede uma lista de nomes [g_nome]
+    nos_ids = {{ mesh_variable }}.getNodes([g_nome])
+    total_nos = len(nos_ids)
+    
+    # Formata para o terminal
+    str_composicao = f"Node:{total_nos}"
+    print(f"{g_nome:<30} | {total_nos:<8} | {str_composicao}")
+    
+    # Guarda no dicionario
+    # O tipo 'Node' eh usado para o JS detectar corretamente na UI
+    dados_output["groups"][g_nome] = {
+        "count": total_nos,
+        "types": {"Node": total_nos}
+    }
+
+print("="*90 + "\n")
+
+# -----------------------------------------------------------------------------
+# SALVANDO O MESH_GROUPS.JSON (CAMINHO ABSOLUTO INJETADO)
+# -----------------------------------------------------------------------------
+try:
+    # A variavel output_folder e injetada pelo script Python inspect_mesh.py
+    # Usamos string raw (r) para evitar problemas com barras
+    pasta_destino = r"{{ output_folder }}"
+    
+    # Garante que a pasta existe (embora o Python main ja tenha criado)
+    if not os.path.exists(pasta_destino):
+        os.makedirs(pasta_destino)
+    
+    # Define o caminho completo do arquivo JSON
+    caminho_json = os.path.join(pasta_destino, "mesh_groups.json")
+    
+    with open(caminho_json, 'w') as f:
+        json.dump(dados_output, f, indent=4)
+        
+    imprimir_na_tela(f"[ASTER] Resultado da inspecao salvo em:\n{caminho_json}")
+
+except Exception as e:
+    imprimir_na_tela(f"[ERRO] Falha ao salvar mesh_groups.json: {e}")

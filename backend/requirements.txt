@@ -1,0 +1,9 @@
+flask
+flask-cors
+pywebview
+jinja2
+requests
+sectionproperties
+matplotlib
+meshio
+h5py

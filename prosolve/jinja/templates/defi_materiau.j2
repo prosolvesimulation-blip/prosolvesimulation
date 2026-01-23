@@ -1,0 +1,9 @@
+{% for mat in definitions %}
+{{ mat.var_name }} = DEFI_MATERIAU(
+    ELAS=_F(
+        E={{ mat.E }},
+        NU={{ mat.NU }},
+        RHO={{ mat.RHO }}
+    )
+);
+{% endfor %}

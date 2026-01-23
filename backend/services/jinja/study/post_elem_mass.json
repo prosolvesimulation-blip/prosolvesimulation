@@ -1,0 +1,12 @@
+{
+    "mass_calculations": [
+        {
+            "result_name": "tab_mass",
+            "title": "Physical_Mass_Structure",
+            "unit": 26,
+            "format": "TABLEAU",
+            "separator": ",",
+            "export_title": "MASS"
+        }
+    ]
+}

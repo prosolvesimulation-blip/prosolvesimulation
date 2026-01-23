@@ -1,0 +1,18 @@
+{
+    "reaction_extraction": {
+        "enabled": true,
+        "unit": 26,
+        "format": "TABLEAU",
+        "separator": ",",
+        "extract_components": [
+            "DX",
+            "DY",
+            "DZ"
+        ],
+        "moment_components": [
+            "DRX",
+            "DRY",
+            "DRZ"
+        ]
+    }
+}

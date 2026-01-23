@@ -1,0 +1,11 @@
+{
+    "load_cases": [
+        {
+            "loads": [
+                "PESANTEUR_1",
+                "Force_2"
+            ],
+            "name": "Case 1"
+        }
+    ]
+}

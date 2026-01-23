@@ -1,0 +1,13 @@
+{% for cmd in commands %}
+{{ cmd.result_name }} = POST_ELEM(MODELE={{ cmd.model_name }}, 
+                       CHAM_MATER={{ cmd.field_mat_name }}, 
+                       CARA_ELEM={{ cmd.cara_elem_name }},
+                       MASS_INER=_F(TOUT='OUI'), 
+                       TITRE='{{ cmd.title }}')
+
+IMPR_TABLE(TABLE={{ cmd.result_name }}, 
+           UNITE={{ cmd.unit }}, 
+           FORMAT='{{ cmd.format }}', 
+           SEPARATEUR='{{ cmd.separator }}', 
+           TITRE='{{ cmd.export_title }}')
+{% endfor %}

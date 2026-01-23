@@ -1,0 +1,6 @@
+# Configurações de Caminhos do ProSolve
+# Gerado Automaticamente
+
+ASTER_BIN=C:\code_aster\v2024\bin\as_run.bat
+FREECAD_BIN=C:\Users\jorge\OneDrive\ProSolve_Studio\engines\freecad\bin\freecad.exe
+SALOME_BIN=C:\Users\jorge\OneDrive\ProSolve_Studio\engines\salome\run_salome.bat

@@ -1,0 +1,17 @@
+P actions make_etude
+P rep_trav {{ temp_path }}
+P memory_limit 2048
+P time_limit 900.0
+P version stable
+P ncpus 1
+P mpi_nbcpu 1
+P mode interactif
+F comm {{ comm_path }} D 1
+F mess {{ message_path }} R 6
+R base {{ base_path }} R 0
+{% for mesh in meshes %}
+F mmed {{ mesh.path }} D {{ mesh.unit }}
+{% endfor %}
+{% if csv_path %}
+F dat {{ csv_path }} R 26
+{% endif %}

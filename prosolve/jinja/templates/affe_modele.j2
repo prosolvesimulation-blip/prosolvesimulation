@@ -1,0 +1,8 @@
+{{ result_name }} = AFFE_MODELE(
+    MAILLAGE={{ mesh_name }},
+    AFFE=(
+    {%- for item in items %}
+        _F(GROUP_MA='{{ item.group }}', PHENOMENE='{{ item.phenomene }}', MODELISATION='{{ item.modelisation }}'),
+    {%- endfor %}
+    ),
+);

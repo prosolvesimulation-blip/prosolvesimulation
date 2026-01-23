@@ -1,0 +1,14 @@
+{
+    "shells": [
+        {
+            "group": "12mm",
+            "thickness": 10,
+            "excentricity": 0,
+            "vector": [
+                1,
+                0,
+                0
+            ]
+        }
+    ]
+}

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+simulation_files/temp/
+simulation_files/base/
+simulation_files/resu.*
+*.med
+*.comm
+*.export
+*.1
+glob.1
+*.base
+*.mess
+*.mess.*
+*.resu
+*.resu.*
+*.err
+*.err.*
+*.out
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

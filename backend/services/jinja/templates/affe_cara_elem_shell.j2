@@ -1,0 +1,19 @@
+{{ result_name }} = AFFE_CARA_ELEM(
+    MODELE={{ model_name }},
+    INFO=1,
+    COQUE=(
+    {%- for item in items %}
+        _F(
+            GROUP_MA='{{ item.group }}',
+            EPAIS={{ item.epais }},
+            VECTEUR={{ item.vecteur }},
+            EXCENTREMENT={{ item.excentrement }},
+            A_CIS={{ item.a_cis }},
+            COEF_RIGI_DRZ={{ item.coef_rigi_drz }},
+            COQUE_NCOU={{ item.coque_ncou }},
+            INER_ROTA='{{ item.iner_rota }}',
+            MODI_METRIQUE='{{ item.modi_metrique }}'
+        ),
+    {%- endfor %}
+    ),
+);

@@ -1,0 +1,42 @@
+{
+    "geometries": [
+        {
+            "_category": "2D",
+            "formulation": "DKT",
+            "group": "12mm_X_-6",
+            "phenomenon": "MECANIQUE",
+            "type": "DKT"
+        },
+        {
+            "_category": "1D",
+            "group": "I300x200x10x10",
+            "phenomenon": "MECANIQUE",
+            "type": "POU_D_T"
+        },
+        {
+            "_category": "Node",
+            "group": "node_group_beam",
+            "phenomenon": "MECANIQUE",
+            "type": "Node"
+        },
+        {
+            "_category": "Node",
+            "group": "node_group_plate",
+            "phenomenon": "MECANIQUE",
+            "type": "Node"
+        },
+        {
+            "_category": "3D",
+            "group": "solid",
+            "phenomenon": "MECANIQUE",
+            "type": "3D"
+        },
+        {
+            "_category": "2D",
+            "formulation": "DKT",
+            "group": "solid_group_face",
+            "phenomenon": "MECANIQUE",
+            "type": "DKT"
+        }
+    ]
+}

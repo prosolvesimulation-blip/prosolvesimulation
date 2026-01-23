@@ -1,0 +1,19 @@
+{{ result_name }} = AFFE_CHAR_MECA(
+    MODELE={{ modele }},
+    FORCE_NODALE=(
+        {%- for item in items %}
+        _F(
+            GROUP_MA='{{ item.GROUP_MA }}',
+            {%- if item.FX is defined %}
+            FX={{ item.FX }},
+            {%- endif %}
+            {%- if item.FY is defined %}
+            FY={{ item.FY }},
+            {%- endif %}
+            {%- if item.FZ is defined %}
+            FZ={{ item.FZ }},
+            {%- endif %}
+        ),
+        {%- endfor %}
+    ),
+);

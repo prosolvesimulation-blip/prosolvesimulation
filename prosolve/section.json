@@ -1,0 +1,25 @@
+[
+  {
+    "id": 1,
+    "name": "Viga_Principal_W200",
+    "type": "I_SECTION",
+    "params": {
+      "h": 200,
+      "tw": 6.3,
+      "bf_top": 100,
+      "tf_top": 8.0,
+      "bf_bot": 100,
+      "tf_bot": 8.0,
+      "r": 5
+    }
+  },
+  {
+    "id": 2,
+    "name": "Coluna_Tubular",
+    "type": "TUBE",
+    "params": {
+      "r": 60,
+      "t": 4.5
+    }
+  }
+]

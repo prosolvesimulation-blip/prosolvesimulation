@@ -1,0 +1,3 @@
+@echo off
+echo Starting ProSolve Studio Server...
+.\python\python.exe server.py

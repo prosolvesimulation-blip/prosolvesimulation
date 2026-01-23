@@ -1,0 +1,13 @@
+#
+#--------------------------------------------------------------------------------
+##REAC_LC1ASTER 16.05.00 CONCEPT 00000035 CALCULE LE 17/01/2026 A 11:16:06 DE TYPE        
+#TABLE_SDASTER                                                                   
+INTITULE,RESU,NOM_CHAM,NUME_ORDRE,INST,RESULT_X,RESULT_Y,RESULT_Z,MOMENT_X,MOMENT_Y,MOMENT_Z
+Reac_LC1        ,0000000d,REAC_NODA       ,           1, 0.00000E+00, 0.00000E+00, 0.00000E+00, 5.49050E+10,-1.08050E+12, 4.30473E+12, 0.00000E+00
+
+#
+#--------------------------------------------------------------------------------
+##MASSPhysical_Mass_Structure                                                         
+LIEU,ENTITE,MASSE,CDG_X,CDG_Y,CDG_Z,IX_G,IY_G,IZ_G,IXY_G,IXZ_G,IYZ_G,IX_PRIN_G,IY_PRIN_G,IZ_PRIN_G,ALPHA,BETA,GAMMA
+00000001                ,TOUT    , 5.59684E+09,-7.84032E+01,-1.96794E+01, 0.00000E+00, 9.53014E+12, 1.16648E+14, 1.26084E+14, 1.34277E-03, 0.00000E+00, 0.00000E+00, 9.53014E+12, 1.16648E+14, 1.26084E+14, 0.00000E+00,-0.00000E+00, 0.00000E+00
+

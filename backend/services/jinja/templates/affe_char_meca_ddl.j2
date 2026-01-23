@@ -1,0 +1,14 @@
+{% for item in commands %}
+{{ item.name }} = AFFE_CHAR_MECA(
+    DDL_IMPO=_F(
+    {%- for key, val in item.params %}
+        {{ key }}={{ val }},
+    {%- endfor %}
+        GROUP_NO='{{ item.group }}'),
+    DOUBLE_LAGRANGE='{{ item.double_lagrange }}',
+    INFO={{ item.info }},
+    MODELE={{ item.model_name }},
+    VERI_AFFE='{{ item.veri_affe }}',
+    VERI_NORM='{{ item.veri_norm }}',
+);
+{% endfor %}

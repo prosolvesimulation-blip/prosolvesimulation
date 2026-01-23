@@ -1,0 +1,42 @@
+{% for run in runs %}
+# --- Análise Mecânica: {{ run.case_name }} ---
+{{ run.result_name }} = MECA_STATIQUE(
+    CARA_ELEM={{ run.cara_elem }},
+    CHAM_MATER={{ run.cham_mater }},
+    EXCIT=(
+    {%- for excit in run.excit_list %}
+        _F(CHARGE={{ excit.charge }}, TYPE_CHARGE='{{ excit.type_charge }}'),
+    {%- endfor %}
+    ),
+    INFO={{ run.info }},
+    MODELE={{ run.modele }},
+    OPTION='{{ run.option }}',
+    SOLVEUR=_F(
+        {%- for key, val in run.solveur.items() %}
+        {{ key }}={{ val|tojson if val is string else val }}, # Simplificação
+        {%- endfor %}
+    ),
+);
+
+{% if run.reaction_extraction %}
+# --- Extração de Reações: {{ run.case_name }} ---
+{{ run.result_name }} = CALC_CHAMP(reuse={{ run.result_name }},
+                         RESULTAT={{ run.result_name }},
+                         FORCE=('REAC_NODA',))
+
+REAC_{{ run.case_name }} = POST_RELEVE_T(ACTION=_F(OPERATION='EXTRACTION',
+                                          INTITULE='Reac_{{ run.case_name }}',
+                                          RESULTAT={{ run.result_name }},
+                                          NOM_CHAM='REAC_NODA',
+                                          GROUP_NO=({% for g in run.reaction_extraction.groups %}'{{ g }}'{{ ', ' if not loop.last }}{% endfor %}),
+                                          RESULTANTE={{ run.reaction_extraction.resultante }},
+                                          MOMENT={{ run.reaction_extraction.moment }},
+                                          POINT=(0,0,0)))
+
+IMPR_TABLE(TABLE=REAC_{{ run.case_name }},
+           UNITE={{ run.reaction_extraction.unit }},
+           FORMAT='{{ run.reaction_extraction.format }}',
+           SEPARATEUR='{{ run.reaction_extraction.separator }}',
+           TITRE='REAC_{{ run.case_name }}')
+{% endif %}
+{% endfor %}

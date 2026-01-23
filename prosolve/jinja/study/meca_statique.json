@@ -1,0 +1,13 @@
+{
+  "meca_statique": {
+    "cara_elem": "CARA_ELEM",
+    "cham_mater": "CHAM_MATER",
+    "excit": [
+      {
+        "charge": "CHARGE_DDL",
+        "type_charge": "FIXE_CSTE"
+      }
+    ],
+    "modele": "MODELE"
+  }
+}

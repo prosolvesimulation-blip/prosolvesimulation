@@ -1,0 +1,44 @@
+# -----------------------------------------------------------------------
+# FORCE TO PRESSURE CONVERSION LOGIC
+# -----------------------------------------------------------------------
+# Dados de entrada populados pelo Jinja
+PRESS_CONFIG = {{ press_config }}
+GROUPS_CALC = {{ groups }}
+
+# Cria materiais dummy para cálculo
+M_CALC = DEFI_MATERIAU(ELAS=_F(E=1.0, NU=0.3, RHO=1.0))
+FIELD_CALC = AFFE_MATERIAU(
+    MODELE={{ model_name }}, 
+    AFFE=(
+        _F(GROUP_MA=GROUPS_CALC, MATER=M_CALC),
+    )
+)
+CARA_CALC = AFFE_CARA_ELEM(
+    MODELE={{ model_name }}, 
+    COQUE=(
+        _F(GROUP_MA=GROUPS_CALC, EPAIS=1.0),
+    )
+)
+
+press_lookup = {}
+print("INFO: --- CONVERTING PRESSURE LOADS ---")
+for p_name, p_group, p_force in PRESS_CONFIG:
+    # Calcula geometria (mass_iner retorna massa = area * rho(1) * epais(1) = area)
+    tbl_geom = POST_ELEM(
+        MODELE={{ model_name }}, 
+        CHAM_MATER=FIELD_CALC, 
+        CARA_ELEM=CARA_CALC, 
+        MASS_INER=_F(GROUP_MA=(p_group,))
+    )
+    val_dict = tbl_geom.EXTR_TABLE().values()
+    # 'MASSE' é a chave usual para massa em POST_ELEM com MASS_INER
+    # Verifica-se se é MASSE ou outra coisa, mas MASS_INER gera MASSE.
+    area_val = sum(val_dict['MASSE'])
+    
+    if area_val > 0.0:
+        pressure_pa = p_force / area_val
+        print(f"      Load '{p_name}' on '{p_group}': {pressure_pa:.2f} Pa (Force: {p_force}, Area: {area_val:.2f})")
+        press_lookup[p_name] = (p_group, pressure_pa)
+    else:
+        print(f"WARNING: Area is zero for group {p_group}. Force {p_name} set to 0.")
+        press_lookup[p_name] = (p_group, 0.0)

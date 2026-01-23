@@ -1,0 +1,18 @@
+{{ cara_result_name }} = AFFE_CARA_ELEM(
+    MODELE={{ model_result_name }},
+    {% for item in cara_items %}
+    {{ item.type }} = _F(
+        GROUP_MA = '{{ item.group }}',
+        {% if item.type == 'COQUE' %}
+        EPAIS = {{ item.epais }},
+        EXCENTREMENT = {{ item.excentrement }},
+        VECTEUR = {{ item.vecteur }},
+        INER_ROTA = 'OUI',
+        {% elif item.type == 'POUTRE' %}
+        SECTION = '{{ item.section }}',
+        CARA = {{ item.cara }},
+        VALE = {{ item.vale }},
+        {% endif %}
+    ),
+    {% endfor %}
+)
