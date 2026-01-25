@@ -1,0 +1,27 @@
+{
+    "geometries": [
+        {
+            "group": "I300x200x10x10",
+            "type": "POU_D_T",
+            "phenomenon": "MECANIQUE",
+            "_category": "1D",
+            "section_type": "I_SECTION",
+            "profile_name": "Custom",
+            "section_params": {
+                "h": "300",
+                "tw": "10",
+                "bf_top": "200",
+                "tf_top": "10",
+                "bf_bot": "200",
+                "tf_bot": "10",
+                "offset_y": 0,
+                "offset_z": 0,
+                "rotation": "90"
+            }
+        }
+    ],
+    "materials": [],
+    "restrictions": [],
+    "loads": [],
+    "load_cases": []
+}

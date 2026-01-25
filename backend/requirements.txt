@@ -7,3 +7,4 @@ sectionproperties
 matplotlib
 meshio
 h5py
+vtk

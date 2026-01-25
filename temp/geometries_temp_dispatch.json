@@ -1,0 +1,1 @@
+[{"group": "group_shell", "type": "COQUE_3D", "section_params": {"thickness": 10.0, "offset": 5.0}, "_category": "2D"}, {"group": "group_beam", "type": "POU_D_T", "section_params": {"radius": 0.5}, "_category": "1D"}]

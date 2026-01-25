@@ -18,6 +18,7 @@ def get_free_port():
         _, port = s.getsockname()
         return port
 
+
 def create_app():
     """Initialize Flask App."""
     app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/')
@@ -31,6 +32,9 @@ def create_app():
         return app.send_static_file('index.html')
 
     return app
+
+
+
 
 def start_server(port, app):
     """Run Flask server."""
@@ -57,4 +61,4 @@ if __name__ == '__main__':
         background_color='#0f172a' # Match Slate-950 theme
     )
     
-    webview.start(debug=False)
+    webview.start(debug=True)

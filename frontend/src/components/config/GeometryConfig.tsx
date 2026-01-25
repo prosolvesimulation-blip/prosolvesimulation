@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 interface GeometryConfigProps {
     projectPath: string | null
+    meshGroups?: any
     availableGeometries?: any[]
     onUpdate?: (geometries: any[]) => void
 }
@@ -41,8 +42,8 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
                     return cat === '1D' || cat === '2D'
                 })
                 .map((g: any) => {
-                    const isBeam = g.type?.includes('POU') || g.type?.includes('BARRE')
-                    const isShell = g.type?.includes('DKT') || g.type?.includes('DST') || g.type?.includes('COQUE')
+                    const isBeam = g._category === '1D'
+                    const isShell = g._category === '2D'
 
                     let params = {}
                     if (isBeam) {
@@ -69,6 +70,14 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
             onUpdate(geometries)
         }
     }, [geometries, onUpdate])
+
+    // Sync local calculation state when selection changes
+    useEffect(() => {
+        if (geometries[selectedIdx]) {
+            setSectionImage(geometries[selectedIdx].section_image || null)
+            setCalculatedProps(geometries[selectedIdx].section_properties || null)
+        }
+    }, [selectedIdx, geometries])
 
     // Calculate section
     const calculateSection = async () => {
@@ -100,6 +109,16 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
             if (data.status === 'success') {
                 setSectionImage(data.image)
                 setCalculatedProps(data.properties)
+
+                // SAVE RESULT TO GEOMETRIES STATE (Persistence)
+                setGeometries(prev => prev.map((g, i) =>
+                    i === selectedIdx ? {
+                        ...g,
+                        section_properties: data.properties,
+                        section_mesh: data.mesh,
+                        section_image: data.image
+                    } : g
+                ))
             } else {
                 throw new Error(data.message)
             }
@@ -146,6 +165,30 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
         setSplitRatio(w)
     }, [])
 
+    // TAB-LEAVE TRIGGER: Pre-calculate extrusion when leaving tab
+    useEffect(() => {
+        return () => {
+            const hasShells = geometries.some(g => {
+                const isShell = g.type?.includes('DKT') || g.type?.includes('DST') || g.type?.includes('COQUE')
+                const thickness = parseFloat(g.section_params?.thickness || '0')
+                return isShell && thickness > 0
+            })
+
+            if (hasShells && projectPath) {
+                console.log("GEOMETRY_CHILD: Leaving tab. Triggering MEDCoupling extrusion pre-calculation...");
+                // Trigger warm-up request (VTK converter will call med_extruder.py)
+                fetch('/api/get_mesh_vtk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folder_path: projectPath,
+                        geometries: geometries
+                    })
+                }).catch(err => console.error("Extrusion pre-calc failed", err))
+            }
+        }
+    }, [projectPath, geometries]) // Captured state at time of unmount or change
+
     useEffect(() => {
         window.addEventListener('mouseup', handleMouseUp)
         window.addEventListener('mousemove', handleMouseMove)
@@ -168,8 +211,8 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
     }
 
     const selected = geometries[selectedIdx] || geometries[0]
-    const isBeam = selected.type?.includes('POU') || selected.type?.includes('BARRE')
-    const isShell = selected.type?.includes('DKT') || selected.type?.includes('DST') || selected.type?.includes('COQUE')
+    const isBeam = selected._category === '1D'
+    const isShell = selected._category === '2D'
 
     return (
         <div className="flex h-full w-full bg-slate-950 text-slate-200 text-sm overflow-hidden">

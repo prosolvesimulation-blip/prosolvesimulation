@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, FolderOpen, Save, Play } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ModelConfig from './config/ModelConfig'
@@ -8,7 +8,7 @@ import LoadConfig from './config/LoadConfig'
 import GeometryConfig from './config/GeometryConfig'
 import LoadCaseConfig from './config/LoadCaseConfig'
 import MeshConfig from './config/MeshConfig'
-import ThreeDModel from './config/ThreeDModel'
+import VtkMeshViewer from './config/VtkMeshViewer'
 
 interface StructuralWorkspaceProps {
     onBack: () => void
@@ -42,12 +42,73 @@ export default function StructuralWorkspace({
     })
 
     // DEBUG LOG
-    useEffect(() => {
-        console.log("ROOT: projectConfig updated:", projectConfig)
-    }, [projectConfig])
-    const [availableGroups, setAvailableGroups] = useState<string[]>([])
+    const [availableGroups, setAvailableGroups] = useState<string[]>([]) // Group names
+    const [nodeGroups, setNodeGroups] = useState<string[]>([])
+    const [allGroupsData, setAllGroupsData] = useState<any>({}) // Full group metadata
+
     const [meshFiles, setMeshFiles] = useState<string[]>([])
     const [simulationRunning, setSimulationRunning] = useState(false)
+
+    // CONSOLIDATION PROTOCOL: Mesh DNA Pipeline Smart Consumer (Multi-Mesh)
+    useEffect(() => {
+        if (projectPath && meshFiles.length > 0) {
+            const medFiles = meshFiles.filter(f => f.toLowerCase().endsWith('.med'))
+            console.log(`[MeshDNA] Multi-Mesh Protocol: Detected ${medFiles.length} files.`)
+
+            medFiles.forEach(file => {
+                // If not already in global state or if it's a new session
+                fetchMeshDNA(file)
+            })
+        }
+    }, [projectPath, meshFiles])
+
+    const fetchMeshDNA = async (fileName: string) => {
+        try {
+            // Telemetry: Log Port (Protocol)
+            const port = window.location.port || '3000' // Frontend port representation
+            console.log(`[MeshDNA] Fetching from Port: ${port}`)
+
+            const res = await fetch('/api/mesh_dna', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: `${projectPath}\\${fileName}` })
+            })
+            const result = await res.json()
+
+            if (result.status === 'success') {
+                const groups = result.data.groups
+
+                // Telemetry: Filtered Log (Protocol)
+                console.log(`[MeshDNA] Groups Received from ${fileName}:`, Object.keys(groups))
+
+                // Update Independent Global State (Protocol)
+                const globalWindow = window as any
+                if (!globalWindow.projectState) globalWindow.projectState = {}
+                if (!globalWindow.projectState.meshes) globalWindow.projectState.meshes = {}
+
+                // Store mesh data independently by filename
+                globalWindow.projectState.meshes[fileName] = result.data
+
+                // Update Independent Local UI States
+                setAllGroupsData((prev: any) => ({
+                    ...prev,
+                    [fileName]: groups
+                }))
+
+                // 🌟 Update Flat States for Tabs (Accumulation)
+                const newGroupNames = Object.keys(groups)
+                setAvailableGroups(prev => Array.from(new Set([...prev, ...newGroupNames])))
+
+                const newNodes = newGroupNames.filter(name => groups[name].category === 'Node')
+                setNodeGroups(prev => Array.from(new Set([...prev, ...newNodes])))
+
+                // Event Dispatch (Protocol)
+                window.dispatchEvent(new Event('meshDataLoaded'))
+            }
+        } catch (error) {
+            console.error("[MeshDNA] Fetch failed:", error)
+        }
+    }
 
     const handleRunSimulation = async () => {
         if (!projectPath) return
@@ -80,7 +141,6 @@ export default function StructuralWorkspace({
     const handleSaveProject = async () => {
         if (!projectPath) return
         try {
-            // Basic notification (could be improved with toast)
             console.log("Saving project...")
 
             const response = await fetch('/api/save_project', {
@@ -103,6 +163,40 @@ export default function StructuralWorkspace({
         }
     }
 
+    // Memoized update handlers to prevent infinite loops and DATA LOSS (Persistence Fix)
+    const updateGeometries = useCallback((updatedGeos: any[]) => {
+        setProjectConfig(prev => {
+            // Identify which domains (categories) this update represents
+            const currentDomains = new Set(updatedGeos.map(g => g._category).filter(Boolean))
+
+            // If empty (e.g., initial load or deletion), we might need to be careful.
+            // But typical logic is: if update covers 1D/2D, we replace 1D/2D and KEEP 3D/0D.
+            const preserved = prev.geometries.filter(g => !currentDomains.has(g._category))
+
+            return {
+                ...prev,
+                geometries: [...preserved, ...updatedGeos]
+            }
+        })
+    }, [])
+
+    const updateMaterials = useCallback((materials: any[]) => {
+        setProjectConfig(prev => ({ ...prev, materials }))
+    }, [])
+
+    const updateRestrictions = useCallback((restrictions: any[]) => {
+        setProjectConfig(prev => ({ ...prev, restrictions }))
+    }, [])
+
+    const updateLoads = useCallback((loads: any[]) => {
+        setProjectConfig(prev => ({ ...prev, loads }))
+    }, [])
+
+    const updateLoadCases = useCallback((cases: any[]) => {
+        setProjectConfig(prev => ({ ...prev, load_cases: cases }))
+    }, [])
+
+
     const handleOpenFolder = async () => {
         try {
             setIsLoading(true)
@@ -111,6 +205,7 @@ export default function StructuralWorkspace({
 
             if (data.status === 'success' && data.path) {
                 setProjectPath(data.path)
+                setMeshFiles([]) // 🛡️ CRITICAL: Clear old files immediately to prevent Race Condition (Error 400)
 
                 // Try load config, but start with empty if not found
                 setProjectConfig({
@@ -121,20 +216,9 @@ export default function StructuralWorkspace({
                     load_cases: []
                 })
 
-                const loadResp = await fetch('/api/open_project', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ folder_path: data.path })
-                })
-                const loadData = await loadResp.json()
-                if (loadData.status === 'success' && loadData.config) {
-                    setProjectConfig(loadData.config)
-                }
-
                 // 2. Trigger Scan & Inspection
                 // This will generate mesh.json, export.export and RUN inspect_mesh.py -> mesh_groups.json
                 setIsLoading(true)
-                // We show loading while inspection runs (it might take a few seconds)
                 const scanResp = await fetch('/api/scan_workspace', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -158,10 +242,39 @@ export default function StructuralWorkspace({
                     const groupsData = await groupsResp.json()
 
                     if (groupsData.status === 'success' && groupsData.data && groupsData.data.groups) {
-                        setAvailableGroups(groupsData.data.groups)
+                        const allGroups = groupsData.data.groups
+                        const groupNames = Object.keys(allGroups)
+
+                        // 🛡️ DATA PROTECTION: DNA protocol is now the source of truth for allGroupsData.
+                        // We do NOT overwrite it with potentially empty legacy scan results.
+                        // setAllGroupsData(allGroups)
+                        // setAvailableGroups(groupNames)
+
+                        // Categorize
+                        const nodes = groupNames.filter(n => allGroups[n].type === 'node')
+                        // setNodeGroups(nodes)
+
+                        console.log("ROOT: Groups centralized (DNA-only mode):", { nodes, allCount: groupNames.length })
+
+                        // ALWAYS refresh geometries when groups are loaded
+                        setProjectConfig(prev => {
+                            const newGeos = groupNames
+                                .filter(g => allGroups[g].type !== 'node')
+                                .map(g => {
+                                    const existing = prev.geometries.find(ex => ex.group === g)
+                                    if (existing) return existing
+
+                                    return {
+                                        group: g,
+                                        type: '3D',
+                                        phenomenon: 'MECANIQUE',
+                                        _category: '3D'
+                                    }
+                                })
+                            return { ...prev, geometries: newGeos }
+                        })
                     }
                 }
-
             }
         } catch (error) {
             console.error('Failed to open folder:', error)
@@ -282,8 +395,9 @@ export default function StructuralWorkspace({
                                 <ModelConfig
                                     key={projectPath}
                                     projectPath={projectPath}
+                                    meshGroups={allGroupsData}
                                     currentGeometries={projectConfig.geometries}
-                                    onUpdate={(geometries: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, geometries }))}
+                                    onUpdate={updateGeometries}
                                 />
                             )}
                             {activeTab === 'mesh' && (
@@ -298,7 +412,7 @@ export default function StructuralWorkspace({
                                     key={projectPath}
                                     projectPath={projectPath}
                                     initialMaterials={projectConfig.materials}
-                                    onUpdate={(materials: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, materials }))}
+                                    onUpdate={updateMaterials}
                                 />
                             )}
 
@@ -306,16 +420,17 @@ export default function StructuralWorkspace({
                                 <GeometryConfig
                                     key={projectPath}
                                     projectPath={projectPath}
+                                    meshGroups={allGroupsData}
                                     availableGeometries={projectConfig.geometries}
-                                    onUpdate={(geometries: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, geometries }))}
+                                    onUpdate={updateGeometries}
                                 />
                             )}
 
                             {activeTab === '3d-view' && (
-                                <ThreeDModel
+                                <VtkMeshViewer
                                     projectPath={projectPath}
+                                    meshKey={Date.now()}
                                     geometries={projectConfig.geometries}
-                                    meshes={meshFiles}
                                 />
                             )}
 
@@ -323,21 +438,18 @@ export default function StructuralWorkspace({
                                 <RestrictionConfig
                                     key={projectPath}
                                     projectPath={projectPath}
-                                    availableGroups={availableGroups.length > 0 ? availableGroups : projectConfig.geometries.map((g: any) => g.group)}
+                                    availableGroups={nodeGroups.length > 0 ? nodeGroups : availableGroups} // Prefer node groups
                                     initialRestrictions={projectConfig.restrictions}
-                                    onUpdate={(restrictions: any[]) => {
-                                        console.log("ROOT: Received update from Restrictions:", restrictions)
-                                        setProjectConfig((prev: ProjectConfig) => ({ ...prev, restrictions }))
-                                    }}
+                                    onUpdate={updateRestrictions}
                                 />
                             )}
                             {activeTab === 'loads' && (
                                 <LoadConfig
                                     key={projectPath}
                                     projectPath={projectPath}
-                                    availableGroups={availableGroups.length > 0 ? availableGroups : projectConfig.geometries.map((g: any) => g.group)}
+                                    availableGroups={availableGroups}
                                     initialLoads={projectConfig.loads}
-                                    onUpdate={(loads: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, loads }))}
+                                    onUpdate={updateLoads}
                                 />
                             )}
                             {activeTab === 'loadcases' && (
@@ -346,7 +458,7 @@ export default function StructuralWorkspace({
                                     projectPath={projectPath}
                                     availableLoads={projectConfig.loads}
                                     initialLoadCases={projectConfig.load_cases}
-                                    onUpdate={(cases: any[]) => setProjectConfig((prev: ProjectConfig) => ({ ...prev, load_cases: cases }))}
+                                    onUpdate={updateLoadCases}
                                 />
                             )}
                         </div>

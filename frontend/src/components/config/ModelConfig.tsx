@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react'
 
 interface MeshGroup {
     name: string
+    meshFile: string // NEW: Source identification
     selected: boolean
     count: number
     composition: string
@@ -13,6 +14,7 @@ interface MeshGroup {
 
 interface ModelConfigProps {
     projectPath: string | null
+    meshGroups?: any // NEW: Provided by StructuralWorkspace
     currentGeometries?: any[]
     onUpdate?: (geometries: any[]) => void
 }
@@ -38,11 +40,18 @@ const MODEL_OPTIONS = {
     ]
 }
 
-export default function ModelConfig({ projectPath, currentGeometries = [], onUpdate }: ModelConfigProps) {
+export default function ModelConfig({ projectPath, meshGroups, currentGeometries = [], onUpdate }: ModelConfigProps) {
     const [groups, setGroups] = useState<MeshGroup[]>([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const isFirstRender = useRef(true)
+    const lastGroupsSignatureRef = useRef<string>('')
+    const lastExportSignatureRef = useRef<string>('')
+
+    useEffect(() => {
+        if (meshGroups) {
+            // console.log("🔍 [DEBUG MODEL] Component Props meshGroups:", meshGroups); // Removed redundant log
+            // console.log("🔍 [DEBUG MODEL] Global State meshes:", (window as any).projectState?.meshes); // Removed redundant log
+        }
+    }, [meshGroups]);
 
     useEffect(() => {
         if (isFirstRender.current) {
@@ -55,17 +64,12 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
                 .filter(g => g.selected)
                 .map(g => ({
                     group: g.name,
-                    // Preserve existing props logic if we were purely merging, 
-                    // but here we reconstruct the export object.
-                    // IMPORTANT: The backend builder expects specific keys.
-                    // We need to ensure we don't lose 'thickness', 'section_params', etc.
-                    // But ModelConfig doesn't KNOW about them.
-                    // So we must MERGE with currentGeometries finds.
+                    _meshFile: g.meshFile, // Internal tracking
+                    // ...MERGE logic
                     ...(() => {
-                        const existing = currentGeometries.find(c => c.group === g.name) || {}
+                        const existing = currentGeometries.find(c => c.group === g.name && c._meshFile === g.meshFile) || {}
                         return {
-                            ...existing, // Keep everything (thickness, params, etc)
-                            // Overwrite what we control
+                            ...existing,
                             type: g.model,
                             formulation: (g.model === 'DKT' || g.model === 'DST') ? g.model : undefined,
                             phenomenon: 'MECANIQUE',
@@ -73,15 +77,59 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
                         }
                     })()
                 }))
-            onUpdate(exportData)
+
+            // Stability check: Only update parent if serialized data changed
+            const expSignature = JSON.stringify(exportData)
+            if (expSignature !== lastExportSignatureRef.current) {
+                lastExportSignatureRef.current = expSignature
+                onUpdate(exportData)
+            }
         }
     }, [groups, onUpdate])
 
+    // React to prop changes independently
     useEffect(() => {
-        if (projectPath) {
-            loadMeshGroups()
+        if (meshGroups) {
+            // PERFORMANCE PROTOCOL: Signature-based check (only files and group names)
+            // This prevents the infinite loop while remaining extremely fast
+            const signature = JSON.stringify(Object.entries(meshGroups).map(([file, groups]: [string, any]) => ({
+                file,
+                groups: Object.keys(groups).sort()
+            })))
+
+            if (signature === lastGroupsSignatureRef.current) {
+                return // Structure hasn't changed, skip re-mapping to stop loop
+            }
+            lastGroupsSignatureRef.current = signature
+
+            console.log("MODEL_CHILD: Mapping independent meshGroups keys:", Object.keys(meshGroups))
+            const loadedGroups: MeshGroup[] = []
+
+            // Iterate through each mesh file independently
+            Object.entries(meshGroups).forEach(([fileName, groupsInFile]: [string, any]) => {
+                Object.entries(groupsInFile).forEach(([groupName, info]: [string, any]) => {
+                    const category = info.category || detectCategory(info.types || {})
+                    const compStr = info.types ? Object.entries(info.types)
+                        .map(([t, q]) => `${t}:${q}`)
+                        .join(', ') : category
+
+                    const existingConfig = currentGeometries.find((c: any) => c.group === groupName && c._meshFile === fileName)
+
+                    loadedGroups.push({
+                        name: groupName,
+                        meshFile: fileName,
+                        selected: currentGeometries.length > 0 ? !!existingConfig : true,
+                        count: info.count,
+                        composition: compStr,
+                        category: category,
+                        model: existingConfig?.type || detectDefaultModel(category),
+                        phenomenon: 'MECANIQUE'
+                    })
+                })
+            })
+            setGroups(loadedGroups)
         }
-    }, [projectPath])
+    }, [meshGroups, currentGeometries])
 
     const detectCategory = (typesObj: any): string => {
         const types = Object.keys(typesObj)
@@ -95,59 +143,13 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
     const detectDefaultModel = (category: string): string => {
         if (category === 'Node') return 'Node'
         if (category === '3D') return '3D'
-        if (category === '2D') return 'DKT'
+        if (category === '2D') return 'COQUE_3D'
         if (category === '1D') return 'POU_D_T'
         return '3D'
     }
 
-    const loadMeshGroups = async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const response = await fetch('/api/read_mesh_groups', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ folder_path: projectPath })
-            })
-
-            const result = await response.json()
-            if (result.status === 'error') throw new Error(result.message)
-
-            const data = result.data
-            const loadedGroups: MeshGroup[] = []
-
-            if (data && data.groups) {
-                Object.entries(data.groups).forEach(([groupName, info]: [string, any]) => {
-                    const category = detectCategory(info.types)
-                    const compStr = Object.entries(info.types)
-                        .map(([t, q]) => `${t}:${q}`)
-                        .join(', ')
-
-                    // Merge with existing config (currentGeometries)
-                    const existingConfig = currentGeometries.find((c: any) => c.group === groupName)
-
-                    loadedGroups.push({
-                        name: groupName,
-                        // If currentGeometries is not empty, and group NOT in it -> selected = false?
-                        // But wait, "selected" means "included in analysis".
-                        // If currentGeometries has items, checking existence implies selection.
-                        selected: currentGeometries.length > 0 ? !!existingConfig : true,
-                        count: info.count,
-                        composition: compStr,
-                        category: category,
-                        model: existingConfig?.type || detectDefaultModel(category),
-                        phenomenon: 'MECANIQUE'
-                    })
-                })
-            }
-            setGroups(loadedGroups)
-        } catch (err: any) {
-            if (!err.message.includes('não encontrado')) console.error(err)
-            setError('No mesh data found. Please scan workspace first.')
-        } finally {
-            setLoading(false)
-        }
-    }
+    // REDUNDANT INTERNAL FETCH REMOVED (Centralized in StructuralWorkspace)
+    // const loadMeshGroups = async () => { ... }
 
     const handleCheckboxChange = (index: number) => {
         const newGroups = [...groups]
@@ -170,23 +172,14 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
         return <div className="p-10 text-center text-slate-500">Please select a project.</div>
     }
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center h-64 text-blue-400 animate-pulse">
-                <div className="text-4xl mb-2">📡</div>
-                <p>Loading Mesh Data...</p>
-            </div>
-        )
-    }
-
-    if (error || groups.length === 0) {
+    if (groups.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-10 text-slate-400">
                 <div className="text-4xl mb-4 text-slate-600">🕸️</div>
                 <h3 className="text-xl font-bold text-slate-300 mb-2">No Mesh Groups Detected</h3>
-                <p className="mb-6 text-center max-w-md text-sm">{error}</p>
+                <p className="mb-6 text-center max-w-md text-sm">Please scan workspace first from the Toolbar.</p>
                 <button
-                    onClick={loadMeshGroups}
+                    onClick={() => window.location.reload()} // Simple fallback as parent should handle refresh
                     className="px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors border border-slate-600"
                 >
                     Refresh Data
@@ -227,6 +220,7 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
                         <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase tracking-wider sticky top-0 z-10">
                             <tr>
                                 <th className="p-3 w-12 text-center border-b border-slate-800">Sel.</th>
+                                <th className="p-3 w-1/4 border-b border-slate-800">Mesh Source</th>
                                 <th className="p-3 w-1/4 border-b border-slate-800">Group Name</th>
                                 <th className="p-3 w-1/4 border-b border-slate-800">Composition</th>
                                 <th className="p-3 w-1/4 border-b border-slate-800">Model Definition</th>
@@ -250,6 +244,10 @@ export default function ModelConfig({ projectPath, currentGeometries = [], onUpd
                                                 onChange={() => handleCheckboxChange(idx)}
                                                 className="w-4 h-4 rounded border-slate-500 bg-slate-700 accent-blue-600 cursor-pointer"
                                             />
+                                        </td>
+
+                                        <td className="p-3 text-xs font-mono text-slate-500 truncate max-w-[120px]" title={group.meshFile}>
+                                            {group.meshFile}
                                         </td>
 
                                         <td className="p-3 font-mono font-medium text-blue-300">

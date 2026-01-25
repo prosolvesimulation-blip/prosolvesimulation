@@ -84,6 +84,8 @@ const InstancedBeams = ({ groupName, nodes, connectivity, sectionDef }: any) => 
     const matrices = useMemo(() => {
         const mats: THREE.Matrix4[] = []
         const dummy = new THREE.Object3D()
+        const v1 = new THREE.Vector3()
+        const v2 = new THREE.Vector3()
 
         connectivity.forEach((elem: number[]) => {
             if (elem.length < 2) return
@@ -93,8 +95,8 @@ const InstancedBeams = ({ groupName, nodes, connectivity, sectionDef }: any) => 
             // Safety check for nodes
             if (!n1 || !n2) return
 
-            const v1 = new THREE.Vector3(n1[0], n1[1], n1[2])
-            const v2 = new THREE.Vector3(n2[0], n2[1], n2[2])
+            v1.set(n1[0], n1[1], n1[2])
+            v2.set(n2[0], n2[1], n2[2])
 
             const dist = v1.distanceTo(v2)
             if (dist < 0.0001) return // Avoid zero length issues
@@ -134,30 +136,30 @@ const InstancedBeams = ({ groupName, nodes, connectivity, sectionDef }: any) => 
 
 // Simple Line Renderer
 const LineGroup = ({ groupName, nodes, connectivity }: any) => {
-    const points = useMemo(() => {
-        const p: THREE.Vector3[] = []
+    const positionBuffer = useMemo(() => {
+        const p: number[] = []
         connectivity.forEach((c: number[]) => {
             if (c.length >= 2) {
                 const n1 = nodes[c[0]]
                 const n2 = nodes[c[1]]
                 if (n1 && n2) {
-                    p.push(new THREE.Vector3(...n1))
-                    p.push(new THREE.Vector3(...n2))
+                    p.push(n1[0], n1[1], n1[2])
+                    p.push(n2[0], n2[1], n2[2])
                 }
             }
         })
-        return p
+        return new Float32Array(p)
     }, [nodes, connectivity])
 
-    if (points.length === 0) return null
+    if (positionBuffer.length === 0) return null
 
     return (
         <lineSegments>
             <bufferGeometry>
                 <bufferAttribute
                     attach="attributes-position"
-                    count={points.length}
-                    args={[new Float32Array(points.flatMap(v => [v.x, v.y, v.z])), 3]}
+                    count={positionBuffer.length / 3}
+                    args={[positionBuffer, 3]}
                 />
             </bufferGeometry>
             <lineBasicMaterial color={stringToColor(groupName)} linewidth={2} />
@@ -228,8 +230,13 @@ export default function ThreeDModel({ projectPath, geometries, meshes = [] }: Th
         fetchAllMeshes()
     }, [projectPath, meshes])
 
-    if (loading) return <div className="text-white flex items-center justify-center h-full">Loading 3D Meshes...</div>
-    if (error) return <div className="text-red-500 flex items-center justify-center h-full">Error: {error}</div>
+    if (loading) return <div className="text-white flex items-center justify-center h-full gap-2">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        Loading 3D Meshes...
+    </div>
+    if (error) return <div className="text-red-500 flex items-center justify-center h-full p-10 text-center">
+        Error loading 3D Model: {typeof error === 'string' ? error : JSON.stringify(error)}
+    </div>
 
     const allGroupsFlat = useMemo(() => {
         const list: { name: string, hasGeo: boolean, color: string }[] = []
@@ -254,10 +261,10 @@ export default function ThreeDModel({ projectPath, geometries, meshes = [] }: Th
         <div className="w-full h-full bg-slate-900 overflow-hidden relative">
             <div className="absolute top-4 right-4 z-10 bg-slate-800/80 p-2 rounded text-xs text-white backdrop-blur max-h-[80%] overflow-y-auto">
                 <h4 className="font-bold mb-1">Groups ({allGroupsFlat.length})</h4>
-                {allGroupsFlat.map(g => (
-                    <div key={g.name} className="flex items-center gap-2 mb-1">
-                        <span className="w-3 h-3 rounded-full" style={{ background: g.color }}></span>
-                        <span>{g.name} {g.hasGeo ? '(Beam)' : ''}</span>
+                {allGroupsFlat.map((g, idx) => (
+                    <div key={`${g.name}-${idx}`} className="flex items-center gap-2 mb-1">
+                        <span className="w-3 h-3 rounded-full" style={{ background: String(g.color || '#ccc') }}></span>
+                        <span>{String(g.name || 'Unknown')} {g.hasGeo ? '(Beam)' : ''}</span>
                     </div>
                 ))}
             </div>

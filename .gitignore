@@ -21,6 +21,9 @@ glob.1
 *.err.*
 *.out
 
+# MEDCOUPLING
+MEDCOUPLING-9.15.0/
+
 # Node / Frontend
 node_modules/
 dist/

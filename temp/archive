@@ -1,0 +1,37 @@
+import sys
+import os
+
+try:
+    import MEDLoader as ml
+    import medcoupling as mc
+    
+    file_path = r"c:\Users\jorge\OneDrive\ProSolveSimulation\test01\beam.med"
+    mesh_names = ml.GetMeshNames(file_path)
+    mesh_name = mesh_names[0]
+    
+    mesh_sub = ml.ReadUMeshFromGroups(file_path, mesh_name, 0, ['I300x200x10x10'])
+    
+    print("\n" + "="*50)
+    print("MESH SUBSET INFO")
+    print("="*50)
+    print(f"Num Cells: {mesh_sub.getNumberOfCells()}")
+    
+    # Try getType()
+    try:
+        t = mesh_sub.getType()
+        print(f"mesh_sub.getType() -> {t}")
+    except Exception as e:
+        print(f"mesh_sub.getType() FAILED: {e}")
+        
+    # Try getting types array if it's a mixed mesh
+    # Is it splitByType?
+    print("\nChecking for per-cell types...")
+    # Maybe mesh_sub.getCellTypes()? 
+    
+    # Check dir(mesh_sub) for anything starting with 'Type' or 'Geometric'
+    for m in dir(mesh_sub):
+        if 'Type' in m or 'Geometric' in m:
+             print(f"Method: {m}")
+
+except Exception as e:
+    print(f"Error: {e}")

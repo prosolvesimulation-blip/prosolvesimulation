@@ -52,6 +52,8 @@ export default function LoadConfig({
         }
     }, [initialLoads])
 
+    const lastExportRef = useRef('')
+
     useEffect(() => {
         if (isFirstRender.current) {
             isFirstRender.current = false
@@ -62,30 +64,35 @@ export default function LoadConfig({
             const exportData = loads.map(l => {
                 if (l.type === 'gravity') {
                     return {
-                        name: l.name,
+                        name: String(l.name || ''),
                         type: 'PESANTEUR',
                         direction: [0, 0, -1],
                         gravity: 9.81
                     }
                 } else if (l.type === 'force') {
                     return {
-                        name: l.name,
+                        name: String(l.name || ''),
                         type: 'FORCE_NODALE',
-                        group: l.group,
+                        group: String(l.group || ''),
                         fx: parseFloat(l.fx || '0'),
                         fy: parseFloat(l.fy || '0'),
                         fz: parseFloat(l.fz || '0')
                     }
                 } else {
                     return {
-                        name: l.name,
+                        name: String(l.name || ''),
                         type: 'PRESSION',
-                        group: l.group,
+                        group: String(l.group || ''),
                         pressure: parseFloat(l.pressure || '0')
                     }
                 }
             })
-            onUpdate(exportData)
+
+            const currentString = JSON.stringify(exportData)
+            if (lastExportRef.current !== currentString) {
+                lastExportRef.current = currentString
+                onUpdate(exportData)
+            }
         }
     }, [loads, onUpdate])
 

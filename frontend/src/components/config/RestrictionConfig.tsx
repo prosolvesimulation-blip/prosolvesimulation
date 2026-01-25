@@ -28,6 +28,7 @@ export default function RestrictionConfig({
 }: RestrictionConfigProps) {
     const [restrictions, setRestrictions] = useState<Restriction[]>([])
     const isFirstRender = useRef(true)
+    const lastExportRef = useRef('')
 
     // DEBUG LOG
     useEffect(() => {
@@ -71,8 +72,8 @@ export default function RestrictionConfig({
 
         if (onUpdate) {
             const exportData = restrictions.map(r => ({
-                name: r.name,
-                group: r.group,
+                name: String(r.name || ''),
+                group: String(r.group || ''),
                 dof: {
                     DX: r.dx ? 0 : null,
                     DY: r.dy ? 0 : null,
@@ -82,8 +83,13 @@ export default function RestrictionConfig({
                     DRZ: r.drz ? 0 : null
                 }
             }))
-            console.log("RESTRICTION_CHILD: Calling onUpdate with:", exportData)
-            onUpdate(exportData)
+
+            // Simple stringification check to avoid redundant parent updates
+            const currentString = JSON.stringify(exportData)
+            if (lastExportRef.current !== currentString) {
+                lastExportRef.current = currentString
+                onUpdate(exportData)
+            }
         }
     }, [restrictions, onUpdate])
 

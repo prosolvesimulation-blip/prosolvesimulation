@@ -1,0 +1,24 @@
+MEDLoader API Documentation
+==============================
+
+--- GetMeshNames ---
+
+    GetMeshNames(std::string const & fileName) -> svec
+    1
+    
+
+--- GetMeshGroupsNames ---
+
+    GetMeshGroupsNames(std::string const & fileName, std::string const & meshName) -> svec
+    1
+    
+
+--- ReadUMeshFromGroups ---
+
+    ReadUMeshFromGroups(std::string const & fileName, std::string const & meshName, int meshDimRelToMax, PyObject * li) -> MEDCouplingUMesh
+    1
+    
+
+--- ReadIdsInGroups ---
+NOT FOUND
+

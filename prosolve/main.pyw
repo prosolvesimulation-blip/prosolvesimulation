@@ -386,7 +386,52 @@ def api_read_mesh_groups():
 
 
 
-@app.route('/api/calculate_section', methods=['POST'])
+@app.route('/api/mesh_dna', methods=['POST'])
+def api_mesh_dna():
+    """
+    Consolidation Protocol Step 1: Serves mesh DNA (topology + normals) to Frontend.
+    """
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        if not file_path or not os.path.exists(file_path):
+            return jsonify({"status": "error", "message": "Invalid file path"}), 400
+
+        # Build command for modular extractor
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        med_dir = os.path.join(base_dir, "MEDCOUPLING-9.15.0", "MEDCOUPLING-9.15.0")
+        extractor = os.path.join(base_dir, "backend", "services", "med", "med_extractor.py")
+        
+        # Telemetry: Log Port
+        port = request.environ.get('SERVER_PORT', '5000')
+        print(f"[MED_API] Serving mesh data on Port: {port}")
+
+        # Execute Extractor via Subprocess
+        cmd = f'cmd /c "cd /d {med_dir} && call env_launch.bat && python \"{extractor}\" \"{file_path}\""'
+        result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+
+        if result.returncode == 0:
+            # Pegar última linha (JSON minificado)
+            output = result.stdout.strip().split('\n')[-1]
+            extracted_data = json.loads(output)
+            
+            if extracted_data.get("status") == "success":
+                # Telemetry: Log Groups (Protocol)
+                groups_found = list(extracted_data.get("data", {}).get("groups", {}).keys())
+                print(f"[MED_API] Extracted Groups: {groups_found}")
+                return jsonify(extracted_data)
+            else:
+                return jsonify(extracted_data), 500
+        else:
+            print(f"[MED_API] Extractor failed: {result.stderr}")
+            return jsonify({"status": "error", "message": result.stderr}), 500
+
+    except Exception as e:
+        print(f"[MED_API] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 def api_calculate_section():
     try:
         # 1. Parse dos Dados

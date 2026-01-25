@@ -1,0 +1,46 @@
+MEDCOUPLING FINAL DISCOVERY
+==============================
+
+--- Cell Type Constants (mc.NORM_*) ---
+NORM_ERROR = 40
+NORM_HEXA20 = 30
+NORM_HEXA27 = 27
+NORM_HEXA8 = 18
+NORM_HEXGP12 = 22
+NORM_MAXTYPE = 33
+NORM_PENTA15 = 25
+NORM_PENTA18 = 28
+NORM_PENTA6 = 16
+NORM_POINT1 = 0
+NORM_POLYGON = 5
+NORM_POLYHED = 31
+NORM_POLYL = 33
+NORM_PYRA13 = 23
+NORM_PYRA5 = 15
+NORM_QPOLYG = 32
+NORM_QUAD4 = 4
+NORM_QUAD8 = 8
+NORM_QUAD9 = 9
+NORM_SEG2 = 1
+NORM_SEG3 = 2
+NORM_SEG4 = 10
+NORM_TETRA10 = 20
+NORM_TETRA4 = 14
+NORM_TRI3 = 3
+NORM_TRI6 = 6
+NORM_TRI7 = 7
+
+Mesh: beam
+Groups: ('I300x200x10x10', 'node_group_beam')
+
+Group: I300x200x10x10
+  Level 0: 50 entities, Type: 1D
+  Level 0: FAILED ('MEDCouplingUMesh' object has no attribute 'getCellType')
+  Level -1: FAILED (Invalid mesh dim relative to max given ! Too low !)
+  Level -2: FAILED (Invalid mesh dim relative to max given ! Too low !)
+
+Group: node_group_beam
+  Level 0: 0 entities, Type: 1D
+  Level -1: FAILED (Invalid mesh dim relative to max given ! Too low !)
+  Level -2: FAILED (Invalid mesh dim relative to max given ! Too low !)
+
