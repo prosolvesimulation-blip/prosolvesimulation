@@ -1,24 +1,9 @@
 {
     "geometries": [
         {
-            "group": "fixed_node",
-            "_meshFile": "shell.med",
-            "type": "Node",
-            "phenomenon": "MECANIQUE",
-            "_category": "Node"
-        },
-        {
-            "group": "load_node",
-            "_meshFile": "shell.med",
-            "type": "Node",
-            "phenomenon": "MECANIQUE",
-            "_category": "Node"
-        },
-        {
             "group": "12mm",
             "_meshFile": "shell.med",
-            "type": "DKT",
-            "formulation": "DKT",
+            "type": "COQUE_3D",
             "phenomenon": "MECANIQUE",
             "_category": "2D",
             "section_type": "SHELL",
@@ -37,7 +22,7 @@
             "name": "Steel_S355",
             "E": 210000000000,
             "nu": 0.3,
-            "rho": 7850,
+            "rho": 7.85e-09,
             "assignedGroups": [
                 "12mm"
             ]
@@ -45,7 +30,7 @@
     ],
     "restrictions": [
         {
-            "name": "Restriction_1",
+            "name": "BC_RULE_1",
             "group": "fixed_node",
             "dof": {
                 "DX": 0,
@@ -66,17 +51,17 @@
                 0,
                 -1
             ],
-            "gravite": 1000
+            "gravite": 9.81
         }
     ],
     "load_cases": [
         {
-            "name": "Case 1",
+            "name": "LOAD_COMB_01",
             "loads": [
                 "ACCEL_1"
             ],
             "restrictions": [
-                "Restriction_1"
+                "BC_RULE_1"
             ]
         }
     ],

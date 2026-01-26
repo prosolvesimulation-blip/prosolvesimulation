@@ -157,7 +157,9 @@ def calculate_section_properties(section_type: str, params: dict) -> dict:
         s_vals = sec.get_s()
         sxx, syy = s_vals[:2]
         
-        # 6. RETURN PROPERTIES
+        # 6. CALCULATE EXTENTS AND PREPARE PROPERTIES
+        (xmin, xmax, ymin, ymax) = geometry.calculate_extents()
+        
         props = {
             "Area (A)": area,
             "Centroid Y (cy)": cy,
@@ -190,6 +192,12 @@ def calculate_section_properties(section_type: str, params: dict) -> dict:
             
             "Radius Gyration ry": ry,
             "Radius Gyration rz": rx,
+ 
+            # Extents (Relative to Node 0,0)
+            "Min Y": ymin,
+            "Max Y": ymax,
+            "Min X": xmin,
+            "Max X": xmax,
         }
         
         # 7. GENERATE IMAGE
@@ -215,11 +223,8 @@ def calculate_section_properties(section_type: str, params: dict) -> dict:
         ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8, alpha=0.3)
         ax.axvline(x=0, color='black', linestyle='-', linewidth=0.8, alpha=0.3)
         
-        x_data = [0, cx]
-        y_data = [0, cy]
-        (xmin, xmax, ymin, ymax) = geometry.calculate_extents()
-        x_data.extend([xmin, xmax])
-        y_data.extend([ymin, ymax])
+        x_data = [0, cx, xmin, xmax]
+        y_data = [0, cy, ymin, ymax]
         margin = max(xmax-xmin, ymax-ymin) * 0.2
         if margin == 0:
             margin = 10

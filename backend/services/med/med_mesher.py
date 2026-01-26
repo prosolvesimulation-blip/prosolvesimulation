@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 MedMesher Standalone (Background)
-Processes .med files in testcases/hibrido and generates individual JSON files.
-Systeem: 1 Call per Mesh, 1 JSON per Mesh.
+Processes .med files, extracts Full Mesh AND Groups, fixes 'Spiderweb' connectivity,
+and saves individual JSON files per component.
 """
 import sys
 import os
@@ -18,144 +18,165 @@ except ImportError:
     ml = None
     mc = None
 
-def extract_single_mesh(file_path):
-    """Extracts points and structured connectivity using ml/mc module functions."""
+def process_connectivity(raw_conn_flat, num_cells):
+    """
+    🕸️ SPIDERWEB FIX: Limpa a conectividade removendo prefixos de tamanho/tipo.
+    Transforma lista plana em Lista de Listas [[n1,n2,n3], ...].
+    """
+    if num_cells <= 0 or not raw_conn_flat:
+        return []
+
+    total_len = len(raw_conn_flat)
+    nodes_per_elem_total = total_len // num_cells
+    
+    cleaned_connectivity = []
+    
+    for i in range(num_cells):
+        # Fatia o chunk correspondente ao elemento
+        chunk = raw_conn_flat[i * nodes_per_elem_total : (i + 1) * nodes_per_elem_total]
+        
+        # Lógica de Correção:
+        # Se temos mais de 1 item, o primeiro geralmente é o prefixo (Ex: [3, n1, n2, n3])
+        # Padrão MED/VTK para tipos variados.
+        if len(chunk) > 1:
+            cleaned_connectivity.append(chunk[1:]) # Pula o prefixo (Spiderweb Fix)
+        else:
+            cleaned_connectivity.append(chunk)
+            
+    return cleaned_connectivity
+
+def extract_and_save_mesh(file_path, output_dir):
+    """Extrai dados (Full + Groups), corrige conectividade e salva JSONs."""
+    
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"File not found: {file_path}"}
-        
-    if ml is None or mc is None:
-        return {"status": "error", "message": "MEDCoupling modules (MEDLoader/medcoupling) not available"}
+    if ml is None:
+        return {"status": "error", "message": "MEDCoupling unavailable"}
 
     try:
-        # 1. LEITURA HIERÁRQUICA (Protocolo med_extractor)
         mesh_names = ml.GetMeshNames(file_path)
-        if not mesh_names:
-            return {"status": "error", "message": "No meshes found in MED file"}
-        
+        if not mesh_names: return {"status": "error", "message": "No meshes found"}
         mesh_name = mesh_names[0]
         
-        # Carregar Malha Completa (Nível 0)
-        # ReadUMeshFromFile(fileName, meshName, iteration)
-        mesh = ml.ReadUMeshFromFile(file_path, mesh_name, 0)
-        
-        if mesh is None:
-            return {"status": "error", "message": "ReadUMeshFromFile returned None"}
+        # 1. PREPARAR DICIONÁRIO DE EXPORTAÇÃO
+        # Vamos coletar tudo que precisa ser salvo aqui
+        export_targets = {} # { suffix: data_dict }
 
-        # 2. EXTRACT POINTS
-        coords = mesh.getCoords()
-        points = coords.toNumPyArray().flatten().tolist()
-
-        # 3. EXTRACT CONNECTIVITY (Structured - No Flatten!)
-        num_cells = mesh.getNumberOfCells()
-        conn_obj = mesh.getNodalConnectivity()
-        connectivity = []
-
-        if conn_obj is not None:
-            raw_conn = conn_obj.toNumPyArray()
-            if num_cells > 0:
-                if len(raw_conn.shape) > 1:
-                    connectivity = raw_conn.tolist()
-                else:
-                    # Flat list -> element-by-element chunking
-                    total_len = len(raw_conn)
-                    nodes_per_elem_total = total_len // num_cells
-                    flat_list = raw_conn.tolist()
-                    
-                    connectivity = []
-                    for i in range(num_cells):
-                        chunk = flat_list[i * nodes_per_elem_total : (i + 1) * nodes_per_elem_total]
-                        # 🕸️ FIX SPIDERWEB (Enhanced): 
-                        # Strip prefix if it exists. Common patterns:
-                        # 1. Size prefix: [N, node1, ..., nodeN] (chunk[0] == N)
-                        # 2. Type prefix: [TypeID, node1, ..., nodeN] (seen in solids, chunk[0] != N)
-                        if len(chunk) > 1:
-                            # If we have N+1 items, the first is almost certainly a prefix (Size or Type)
-                            # Most standard finite elements (Beam2, Quad4, Hexa8) come in N+1 or N chunks.
-                            # We assume N+1 indicates a prefix.
-                            connectivity.append(chunk[1:])
-                        else:
-                            connectivity.append(chunk)
-
-        # 4. EXTRACT NORMALS (Conditionals)
-        normals = None
+        # --- A. MALHA COMPLETA (Base) ---
         try:
-            # buildOrthogonalField calculates normals for the mesh
-            norm_field = mesh.buildOrthogonalField()
-            if norm_field:
-                normals = norm_field.getArray().toNumPyArray().flatten().tolist()
-        except:
-            normals = None
+            full_mesh = ml.ReadUMeshFromFile(file_path, mesh_name, 0)
+            if full_mesh.getNumberOfCells() > 0:
+                export_targets["_FULL_MESH_"] = full_mesh
+        except Exception as e:
+            print(f"[WARN] Full mesh read error: {e}")
 
-        # 5. GET VTK TYPE
-        # Use first cell type
-        vtk_type = 5 # Default
-        if num_cells > 0:
+        # --- B. GRUPOS (Sub-malhas) ---
+        group_names = ml.GetMeshGroupsNames(file_path, mesh_name)
+        for g_name in group_names:
             try:
-                mc_type = mesh.getTypeOfCell(0)
-                # Mapping conform med_extractor
-                mapping = {
-                    mc.NORM_SEG2: 3, mc.NORM_TRI3: 5, mc.NORM_QUAD4: 9,
-                    mc.NORM_TETRA4: 10, mc.NORM_HEXA8: 12
-                }
-                vtk_type = mapping.get(mc_type, 5)
+                sub_mesh = ml.ReadUMeshFromGroups(file_path, mesh_name, 0, [g_name])
+                if sub_mesh.getNumberOfCells() > 0:
+                    export_targets[g_name] = sub_mesh
             except: pass
 
-        return {
-            "status": "success",
-            "filename": os.path.basename(file_path),
-            "points": points,
-            "connectivity": connectivity,
-            "normals": normals,
-            "vtk_type": vtk_type,
-            "num_points": len(points) // 3,
-            "num_elements": len(connectivity)
-        }
+        # 2. PROCESSAMENTO E SALVAMENTO
+        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        saved_files = []
+
+        for key, mesh_obj in export_targets.items():
+            # Extração de Dados Básicos
+            num_cells = mesh_obj.getNumberOfCells()
+            coords = mesh_obj.getCoords().toNumPyArray().flatten().tolist()
+            
+            # --- O PULO DO GATO: CONECTIVIDADE ---
+            conn_obj = mesh_obj.getNodalConnectivity()
+            raw_conn = conn_obj.toNumPyArray().flatten().tolist()
+            
+            # APLICAR O FIX "SPIDERWEB" AQUI
+            # Transforma raw flat list em lista de listas limpa
+            structured_connectivity = process_connectivity(raw_conn, num_cells)
+
+            # Normais
+            normals = None
+            d_mesh = mesh_obj.getMeshDimension()
+            category = {3: "3D", 2: "2D", 1: "1D"}.get(d_mesh, str(d_mesh) + "D")
+            if category == "2D":
+                try:
+                    norm_field = mesh_obj.buildOrthogonalField()
+                    normals = norm_field.getArray().toNumPyArray().flatten().tolist()
+                except: pass
+
+            # VTK Type
+            try:
+                mc_type = mesh_obj.getTypeOfCell(0)
+                mapping = {mc.NORM_SEG2: 3, mc.NORM_TRI3: 5, mc.NORM_QUAD4: 9, mc.NORM_TETRA4: 10, mc.NORM_HEXA8: 12}
+                vtk_type = mapping.get(mc_type, 5)
+            except: vtk_type = 5
+
+            # Definição do Nome do Arquivo
+            if key == "_FULL_MESH_":
+                suffix = "" # shell.json
+            else:
+                safe_key = key.replace(" ", "_").replace("/", "-")
+                suffix = f"_{safe_key}" # shell_Group.json
+
+            final_name = f"{base_filename}{suffix}.json"
+            final_path = os.path.join(output_dir, final_name)
+
+            # Payload Final
+            payload = {
+                "status": "success",
+                "filename": os.path.basename(file_path),
+                "group_name": key,
+                "points": coords,
+                "connectivity": structured_connectivity, # Agora está LIMPO e ESTRUTURADO
+                "normals": normals,
+                "vtk_type": vtk_type,
+                "num_points": len(coords) // 3,
+                "num_elements": num_cells
+            }
+
+            with open(final_path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, separators=(',', ':'))
+            
+            saved_files.append(final_name)
+            print(f"   -> Saved: {final_name} (Elem: {num_cells})")
+
+        return {"status": "success", "saved": saved_files}
+
     except Exception as e:
-        return {"status": "error", "message": f"{type(e).__name__}: {str(e)}", "traceback": traceback.format_exc()}
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
 def process_directory(dir_path):
-    """Scans and processes all .med files in the directory."""
     print(f"\n[START] Scanning directory: {dir_path}")
-    
     if not os.path.exists(dir_path):
-        print(f"[ABORT] Path does not exist: {dir_path}")
+        print(f"[ABORT] Invalid path")
         return
 
     files = [f for f in os.listdir(dir_path) if f.lower().endswith('.med') and 'resu' not in f.lower()]
-    print(f"[FOUND] {len(files)} mesh files to process.\n")
+    print(f"[FOUND] {len(files)} mesh files.\n")
 
     for f_name in files:
         full_path = os.path.join(dir_path, f_name)
-        json_path = os.path.join(dir_path, f_name.replace('.med', '.json'))
+        print(f"[PROCESS] {f_name}...")
         
-        print(f"[PROCESS] Extracting: {f_name}...")
-        result = extract_single_mesh(full_path)
+        result = extract_and_save_mesh(full_path, dir_path)
         
-        if result["status"] == "success":
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(result, f, separators=(',', ':'))
-            print(f"[SUCCESS] Saved to: {os.path.basename(json_path)} ({result['num_points']} nodes, {result['num_elements']} elements)")
-        else:
-            print(f"[ERROR] Failed {f_name}: {result['message']}")
+        if result["status"] == "error":
+            print(f"[ERROR] {f_name}: {result['message']}")
 
 if __name__ == "__main__":
+    # Caminho Padrão ou Argumento
     if len(sys.argv) > 1:
-        path = sys.argv[1]
-        if os.path.exists(path) and path.lower().endswith('.med'):
-            json_path = path.replace('.med', '.json')
-            result = extract_single_mesh(path)
-            if result["status"] == "success":
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(result, f, separators=(',', ':'))
-                print(f"[EXTRACT] Success: {os.path.basename(json_path)}")
-                sys.exit(0)
-            else:
-                print(f"[EXTRACT] Error: {result['message']}")
-                sys.exit(1)
-
-    # Batch processing of hibrido folder
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    target_dir = os.path.join(base_dir, "testcases", "hibrido")
-    
-    process_directory(target_dir)
-    print("\n[FINISH] Background processing completed.")
+        target = sys.argv[1]
+        if os.path.isfile(target):
+            extract_and_save_mesh(target, os.path.dirname(target))
+        else:
+            process_directory(target)
+    else:
+        # Default Hibrido
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        target_dir = os.path.join(base_dir, "testcases", "hibrido")
+        process_directory(target_dir)
+        
+    print("\n[FINISH] Processing completed.")

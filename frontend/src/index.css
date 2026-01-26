@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-slate-950: #0f172a;
+  --color-slate-950: #020617;
 }
 
 :root {
@@ -11,7 +11,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #020617;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,5 +25,27 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  @apply bg-slate-950 text-white;
+  @apply bg-slate-950 text-white overflow-hidden;
+}
+
+/* Global Sharpening */
+* {
+    border-radius: 0 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }

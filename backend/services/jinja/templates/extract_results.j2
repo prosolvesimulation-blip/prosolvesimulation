@@ -1,18 +1,22 @@
 {% if runs %}
 {% for run in runs %}
+{% set shell_groups = cara_items | selectattr('type', 'equalto', 'COQUE') | map(attribute='group') | list %}
+{% set beam_groups = cara_items | selectattr('type', 'equalto', 'POUTRE') | map(attribute='group') | list %}
+
+
+
+{% if shell_groups %}
 {{ run.result_name }} = CALC_CHAMP(reuse={{ run.result_name }},
                          RESULTAT={{ run.result_name }},
-                         CONTRAINTE=('SIGM_ELNO', 'SIGM_ELGA'),
-                         CRITERES=('SIEQ_ELNO', 'SIEQ_ELGA'),
+                         CONTRAINTE=('SIGM_ELNO',),
+                         CRITERES=('SIEQ_ELNO',),
                          FORCE=('REAC_NODA', 'FORC_NODA'))
 
 
 
-{% if has_shells %}
 RESU_{{ run.case_name }}_INF = POST_CHAMP(RESULTAT={{ run.result_name }},
+                                         GROUP_MA=({{ "'" + shell_groups|join("', '") + "'" }}),
                                          EXTR_COQUE=_F(NOM_CHAM='SIGM_ELNO', NUME_COUCHE=1, NIVE_COUCHE='INF'))
-
-
 
 RESU_{{ run.case_name }}_INF = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_INF,
                                          RESULTAT=RESU_{{ run.case_name }}_INF,
@@ -22,9 +26,8 @@ RESU_{{ run.case_name }}_INF = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_INF,
 
 
 RESU_{{ run.case_name }}_MOY = POST_CHAMP(RESULTAT={{ run.result_name }},
+                                         GROUP_MA=({{ "'" + shell_groups|join("', '") + "'" }}),
                                          EXTR_COQUE=_F(NOM_CHAM='SIGM_ELNO', NUME_COUCHE=1, NIVE_COUCHE='MOY'))
-
-
 
 RESU_{{ run.case_name }}_MOY = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_MOY,
                                          RESULTAT=RESU_{{ run.case_name }}_MOY,
@@ -34,9 +37,8 @@ RESU_{{ run.case_name }}_MOY = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_MOY,
 
 
 RESU_{{ run.case_name }}_SUP = POST_CHAMP(RESULTAT={{ run.result_name }},
+                                         GROUP_MA=({{ "'" + shell_groups|join("', '") + "'" }}),
                                          EXTR_COQUE=_F(NOM_CHAM='SIGM_ELNO', NUME_COUCHE=1, NIVE_COUCHE='SUP'))
-
-
 
 RESU_{{ run.case_name }}_SUP = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_SUP,
                                          RESULTAT=RESU_{{ run.case_name }}_SUP,
@@ -45,14 +47,12 @@ RESU_{{ run.case_name }}_SUP = CALC_CHAMP(reuse=RESU_{{ run.case_name }}_SUP,
 
 
 
-{% endif %}
 IMPR_RESU(FORMAT='MED',
           UNITE=8,
           RESU=(
               _F(RESULTAT={{ run.result_name }},
                  NOM_CHAM=('DEPL', 'REAC_NODA', 'FORC_NODA'),
                  NOM_CHAM_MED=('DEPL_{{ run.case_name }}', 'REAC_{{ run.case_name }}', 'FORC_{{ run.case_name }}')),
-{% if has_shells %}
               _F(RESULTAT=RESU_{{ run.case_name }}_INF,
                  NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
                  NOM_CHAM_MED=('S_INF_{{ run.case_name }}', 'VM_INF_{{ run.case_name }}')),
@@ -62,33 +62,47 @@ IMPR_RESU(FORMAT='MED',
               _F(RESULTAT=RESU_{{ run.case_name }}_SUP,
                  NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
                  NOM_CHAM_MED=('S_SUP_{{ run.case_name }}', 'VM_SUP_{{ run.case_name }}')),
-{% else %}
-              _F(RESULTAT={{ run.result_name }},
-                 NOM_CHAM=('SIGM_ELGA', 'SIEQ_ELGA'),
-                 NOM_CHAM_MED=('SIGM_{{ run.case_name }}', 'SIEQ_{{ run.case_name }}')),
-{% endif %}
           ))
+{% elif beam_groups %}
+{# Para vigas: usar SIPO_ELNO (tensao detalhada) e SIRO_ELEM (tensao max fibra) #}
+{{ run.result_name }} = CALC_CHAMP(reuse={{ run.result_name }},
+                         RESULTAT={{ run.result_name }},
+                         CONTRAINTE=('SIPO_ELNO', 'SIRO_ELEM'),
+                         FORCE=('REAC_NODA', 'FORC_NODA'))
 
 
 
-tab_{{ run.case_name }} = POST_RELEVE_T(ACTION=_F(OPERATION='EXTRACTION',
-                                                 INTITULE='REAC_{{ run.case_name }}',
-                                                 RESULTAT={{ run.result_name }},
-                                                 NOM_CHAM='REAC_NODA',
-                                                 GROUP_NO='TOUT_NO',
-                                                 RESULTANTE=('DX','DY','DZ'),
-                                                 MOMENT=('DRX','DRY','DRZ'),
-                                                 POINT=(0,0,0)))
+IMPR_RESU(FORMAT='MED',
+          UNITE=8,
+          RESU=(
+              _F(RESULTAT={{ run.result_name }},
+                 NOM_CHAM=('DEPL', 'REAC_NODA', 'FORC_NODA'),
+                 NOM_CHAM_MED=('DEPL_{{ run.case_name }}', 'REAC_{{ run.case_name }}', 'FORC_{{ run.case_name }}')),
+              _F(RESULTAT={{ run.result_name }},
+                 NOM_CHAM=('SIPO_ELNO', 'SIRO_ELEM'),
+                 NOM_CHAM_MED=('SIPO_{{ run.case_name }}', 'SIRO_{{ run.case_name }}')),
+          ))
+{% else %}
+{# Fallback para solidos 3D #}
+{{ run.result_name }} = CALC_CHAMP(reuse={{ run.result_name }},
+                         RESULTAT={{ run.result_name }},
+                         CONTRAINTE=('SIGM_ELNO', 'SIGM_NOEU'),
+                         CRITERES=('SIEQ_ELNO', 'SIEQ_NOEU'),
+                         FORCE=('REAC_NODA', 'FORC_NODA'))
 
 
 
-IMPR_TABLE(TABLE=tab_{{ run.case_name }},
-           UNITE=27,
-           FORMAT='TABLEAU',
-           SEPARATEUR=',',
-           TITRE='REACTIONS_{{ run.case_name }}')
-
-
+IMPR_RESU(FORMAT='MED',
+          UNITE=8,
+          RESU=(
+              _F(RESULTAT={{ run.result_name }},
+                 NOM_CHAM=('DEPL', 'REAC_NODA', 'FORC_NODA'),
+                 NOM_CHAM_MED=('DEPL_{{ run.case_name }}', 'REAC_{{ run.case_name }}', 'FORC_{{ run.case_name }}')),
+              _F(RESULTAT={{ run.result_name }},
+                 NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
+                 NOM_CHAM_MED=('SIGM_{{ run.case_name }}', 'SIEQ_{{ run.case_name }}')),
+          ))
+{% endif %}
 
 {% endfor %}
 {% endif %}

@@ -4,6 +4,14 @@ def build_post_elem_mass(config, model_name="MODELE", field_mat_name="CHAM_MATER
     """
     calculations = config.get("mass_calculations", [])
     
+    # Professional Default: Always calculate global mass if not specified
+    if not calculations:
+        calculations = [{
+            "result_name": "tab_mass",
+            "title": "Global_Model_Mass",
+            "export_title": "MASS_PROPERTIES"
+        }]
+    
     commands = []
     for item in calculations:
         commands.append({

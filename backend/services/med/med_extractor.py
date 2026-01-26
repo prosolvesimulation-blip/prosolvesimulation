@@ -5,8 +5,7 @@ import json
 # ==============================================================================
 # MED_EXTRACTOR.PY - PROTOCOLO DE MISSÃO: PONTE DE DADOS (MED -> GLOBAL STATE)
 # Objetivo: Gerar o "DNA" da malha para o window.projectState do Frontend.
-# Regra: Agnóstico, formatado para consumo via API.
-# Ambiente: MEDCOUPLING 9.15.0
+# Atualização: Extrai _FULL_MESH_ + Grupos Individuais.
 # ==============================================================================
 
 try:
@@ -14,7 +13,6 @@ try:
     import medcoupling as mc
     import numpy as np
 except ImportError:
-    # Fail-safe para ambientes externos ao MEDCoupling
     pass
 
 def map_med_to_vtk_protocol(mc_type):
@@ -30,7 +28,16 @@ def map_med_to_vtk_protocol(mc_type):
 
 def extract_med_data(file_path):
     """
-    DNA Extractor: Transforma arquivo MED em JSON compatível com Estado Global.
+    DNA Extractor: Transforma arquivo MED em dict com Malha Base + Grupos.
+    Retorna estrutura:
+    {
+       "data": {
+           "groups": {
+               "_FULL_MESH_": { ... },
+               "Group_1": { ... }
+           }
+       }
+    }
     """
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"File not found: {file_path}"}
@@ -45,66 +52,42 @@ def extract_med_data(file_path):
         group_names = ml.GetMeshGroupsNames(file_path, mesh_name)
         
         results = {}
-        
+
+        # =====================================================================
+        # ETAPA 1.5: EXTRAÇÃO DA MALHA COMPLETA (TUDÃO - _FULL_MESH_)
+        # =====================================================================
+        try:
+            full_mesh = ml.ReadUMeshFromFile(file_path, mesh_name, 0)
+            if full_mesh.getNumberOfCells() > 0:
+                results["_FULL_MESH_"] = _extract_mesh_components(full_mesh)
+        except Exception as e:
+            sys.stderr.write(f"[WARN] Full mesh extraction failed: {e}\n")
+
+        # =====================================================================
+        # ETAPA 2: ITERAÇÃO E CLASSIFICAÇÃO DE GRUPOS
+        # =====================================================================
         for g_name in group_names:
-            # ETAPA 2: ITERAÇÃO E CLASSIFICAÇÃO DE GRUPOS
             try:
-                # 1. Tentar carregar como malha de células (Nível 0)
+                # Tenta carregar como malha de células
                 sub_mesh = ml.ReadUMeshFromGroups(file_path, mesh_name, 0, [g_name])
-                num_cells = sub_mesh.getNumberOfCells()
-                
-                if num_cells > 0:
-                    d_mesh = sub_mesh.getMeshDimension()
-                    # Inferência de Categoria (Protocolo)
-                    category = {3: "3D", 2: "2D", 1: "1D"}.get(d_mesh, str(d_mesh) + "D")
-                    
-                    # VTK Type Mapping (da primeira célula)
-                    mc_type = sub_mesh.getTypeOfCell(0)
-                    vtk_id = map_med_to_vtk_protocol(mc_type)
-                    
-                    # Otimização de Arrays: Points e Connectivity
-                    points = sub_mesh.getCoords().toNumPyArray().flatten().tolist()
-                    connectivity = sub_mesh.getNodalConnectivity().toNumPyArray().flatten().tolist()
-                    
-                    # Normais Condicionais (Protocolo: Apenas 2D)
-                    normals = None
-                    if category == "2D":
-                        try:
-                            norm_field = sub_mesh.buildOrthogonalField()
-                            normals = norm_field.getArray().toNumPyArray().flatten().tolist()
-                        except:
-                            normals = None
-                    
-                    results[g_name] = {
-                        "dimension": int(d_mesh),
-                        "count": int(num_cells),
-                        "category": category,
-                        "type_vtk": int(vtk_id),
-                        "points": points,
-                        "connectivity": connectivity,
-                        "normals": normals
-                    }
-                    continue # Sucesso como grupo de células
-
+                if sub_mesh.getNumberOfCells() > 0:
+                    results[g_name] = _extract_mesh_components(sub_mesh)
+                    continue 
             except:
-                pass # Pode ser um grupo de nós
+                pass 
 
-            # 2. Tentar carregar como grupo de nós (Se necessário para Restrictions)
+            # Tenta carregar como grupo de nós (Opcional, se necessário)
             try:
-                # Nota: Em algumas versões, grupos de nós são lidado diferentemente. 
-                # Se d_mesh falhar acima, classificamos como Node aqui.
-                # Para simplificar e seguir o protocolo:
                 mfile = ml.MEDFileUMesh.New(file_path, mesh_name)
-                # Verifica se g_name é um grupo de nós
                 node_arr = mfile.getNodeGroupArr(g_name)
                 if node_arr and node_arr.getNumberOfTuples() > 0:
                     results[g_name] = {
                         "dimension": 0,
                         "count": int(node_arr.getNumberOfTuples()),
                         "category": "Node",
-                        "type_vtk": 1, # VTK_VERTEX
-                        "points": [], # No global state, nodes groups usually reference global points
-                        "connectivity": node_arr.toNumPyArray().flatten().tolist(), # IDs dos nós
+                        "vtk_type": 1,
+                        "points": [],
+                        "connectivity": node_arr.toNumPyArray().flatten().tolist(), # Node IDs
                         "normals": None
                     }
             except:
@@ -127,8 +110,40 @@ def extract_med_data(file_path):
             "traceback": traceback.format_exc()
         }
 
+def _extract_mesh_components(mesh_obj):
+    """Helper para extrair componentes comuns de um objeto Mesh."""
+    num_cells = mesh_obj.getNumberOfCells()
+    d_mesh = mesh_obj.getMeshDimension()
+    category = {3: "3D", 2: "2D", 1: "1D"}.get(d_mesh, str(d_mesh) + "D")
+    
+    mc_type = mesh_obj.getTypeOfCell(0)
+    vtk_id = map_med_to_vtk_protocol(mc_type)
+    
+    points = mesh_obj.getCoords().toNumPyArray().flatten().tolist()
+    
+    # NOTA: Retornamos o array raw aqui. A limpeza (Spiderweb Fix) 
+    # será feita no Mesher ou no loop final para garantir controle.
+    connectivity_raw = mesh_obj.getNodalConnectivity().toNumPyArray().flatten().tolist()
+    
+    normals = None
+    if category == "2D":
+        try:
+            norm_field = mesh_obj.buildOrthogonalField()
+            normals = norm_field.getArray().toNumPyArray().flatten().tolist()
+        except:
+            normals = None
+            
+    return {
+        "dimension": int(d_mesh),
+        "count": int(num_cells),
+        "category": category,
+        "vtk_type": int(vtk_id),
+        "points": points,
+        "connectivity_raw": connectivity_raw, # Nomeado RAW para indicar que precisa de processamento
+        "normals": normals
+    }
+
 def extract_to_dict(file_path):
-    """Protocol Alias for extract_med_data"""
     return extract_med_data(file_path)
 
 if __name__ == "__main__":
@@ -140,11 +155,8 @@ if __name__ == "__main__":
     
     result_data = extract_med_data(input_med)
     
-    # OUTPUT DUPLO
-    # 1. Stdout Minificado (Produção)
     print(json.dumps(result_data, separators=(',', ':')))
     
-    # 2. Arquivo (Opcional - Debug)
     if output_json:
         with open(output_json, 'w', encoding='utf-8') as f:
             json.dump(result_data, f, indent=2)

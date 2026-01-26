@@ -55,52 +55,68 @@ def build_geometry(geometry_list, model_name="MODELE", result_name="CARA_ELEM"):
                 "group": group,
                 "modelisation": "POU_D_T"
             })
+            
             # Cara assignment
-            # Map frontend types to Aster types
-            # I_SECTION -> I_SECTION doesn't exist directly in simple macros? 
-            # Actually Aster uses explicit parameters (HY, HZ, etc).
-            # The previous code handled RECTANGLE and CIRCLE. 
-            # We need to map new types.
-            
-            aster_section = "RECTANGLE" 
-            aster_vals = "('HY', 'HZ')"
-            
-            # Default values from params or item (fallback)
-            def get_p(k, default):
-                return params.get(k) if params.get(k) is not None else item.get(k, default)
-
-            if section_type == "CIRCLE":
-                aster_section = "CERCLE"
-                r = get_p("r", 10.0)
-                aster_vals = f"({r})"
-                aster_keys = "('R')"
-            elif section_type == "TUBE": # Circular Tube
-                aster_section = "TUBE" # Check Aster syntax? TUBE usually exists.
-                # Actually, in simple POUTRE, TUBE is diff. 
-                # Let's stick to what was supported: RECTANGLE/CIRCLE first.
-                # If the user added I_SECTION, we need valid Aster mapping.
-                # For now, let's keep it safe. 
-                # If the previous code only supported RECTANGLE/CIRCLE, I should be careful.
-                pass 
+            props = item.get("section_properties")
+            if props:
+                # 1. ADVANCED MAPPING: SectionProperties (SP) -> Code_Aster (CA)
+                # CA local Y corresponds to SP Y (vertical in SP viewport)
+                # CA local Z corresponds to SP X (horizontal in SP viewport)
                 
-            # RE-USE EXISTING LOGIC STRUCTURE BUT ADAPTED
-            # The frontend sends: section_type='I_SECTION', section_params={h, tw, ...}
-            # Implementing robust mapping is complex.
-            # Let's assume standard RECTANGLE/CIRCLE for now to avoid regression on existing ones,
-            # and map others if obvious.
+                area = props.get("Area (A)", 1.0)
+                # Use Nodal Inertias (already includes Steiner offset to 0,0)
+                iy = props.get("Iyy (Node 0,0)", 1.0) # Moment about Node Y (SP Y)
+                iz = props.get("Izz (Node 0,0)", 1.0) # Moment about Node Z (SP X)
+                jx = props.get("Torsion J", 1.0)
+                jg = props.get("Warping Iw", 0.0)
+                
+                # Shear coefficients: CA Ay = A / CA Ay'
+                # CA Ay' (along local Y) = SP asy (along SP Y) -> recorded as "Shear Area Az" in calculator
+                # CA Az' (along local Z) = SP asx (along SP X) -> recorded as "Shear Area Ay" in calculator
+                as_y_ca = props.get("Shear Area Az", area)
+                as_z_ca = props.get("Shear Area Ay", area)
+                ay = area / as_y_ca if as_y_ca > 0 else 1.0
+                az = area / as_z_ca if as_z_ca > 0 else 1.0
+                
+                # External fiber distances (RY, RZ) for stress calculation
+                # Check for user-override from UI (fiber_y, fiber_z in section_params)
+                f_y = float(params.get("fiber_y", 0) or 0)
+                f_z = float(params.get("fiber_z", 0) or 0)
+                
+                if abs(f_y) > 1.0e-6 or abs(f_z) > 1.0e-6:
+                    # User specified fiber coordinates - use them directly
+                    ry = abs(f_y)
+                    rz = abs(f_z)
+                else:
+                    # Default: use extreme fibers from section properties
+                    ry = max(abs(props.get("Min Y", 0.0)), abs(props.get("Max Y", 0.0)))
+                    rz = max(abs(props.get("Min X", 0.0)), abs(props.get("Max X", 0.0)))
+                
+                # Set minimum to avoid division by zero
+                ry = max(ry, 1.0e-3)
+                rz = max(rz, 1.0e-3)
+
+                aster_section = "GENERALE"
+                # Removed EY/EZ: properties already provided at the Node (Point of Interest)
+                cara = "('A', 'IY', 'IZ', 'AY', 'AZ', 'JX', 'JG', 'RY', 'RZ')"
+                vale = f"({area}, {iy}, {iz}, {ay}, {az}, {jx}, {jg}, {ry}, {rz})"
             
-            if section_type == "CIRCLE":
-                 r = get_p("r", 50.0)
-                 cara = "('R')"
-                 vale = f"({r})"
-                 aster_section = "CERCLE"
             else:
-                 # Default to Rectangle
-                 aster_section = "RECTANGLE"
-                 hy = get_p("hy", 100.0)
-                 hz = get_p("hz", 50.0)
-                 cara = "('HY', 'HZ')"
-                 vale = f"({hy}, {hz})"
+                # 2. LEGACY DATA / FALLBACK
+                def get_p(k, default):
+                    return params.get(k) if params.get(k) is not None else item.get(k, default)
+
+                if section_type == "CIRCLE" or section_type == "TUBE":
+                    aster_section = "CERCLE"
+                    r = get_p("r", 50.0)
+                    cara = "('R')"
+                    vale = f"({r})"
+                else:
+                    aster_section = "RECTANGLE"
+                    hy = get_p("hy", 100.0)
+                    hz = get_p("hz", 50.0)
+                    cara = "('HY', 'HZ')"
+                    vale = f"({hy}, {hz})"
             
             cara_items.append({
                 "type": "POUTRE",

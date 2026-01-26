@@ -9,6 +9,7 @@ import GeometryConfig from './config/GeometryConfig'
 import LoadCaseConfig from './config/LoadCaseConfig'
 import MeshConfig from './config/MeshConfig'
 import VtkMeshViewer from './config/VtkMeshViewer'
+import VerificationConfig from './config/VerificationConfig'
 
 interface StructuralWorkspaceProps {
     onBack: () => void
@@ -16,7 +17,7 @@ interface StructuralWorkspaceProps {
     setProjectPath: (path: string | null) => void
 }
 
-type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'restrictions' | 'loads' | 'loadcases' | '3d-view'
+type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'verification'
 
 interface ProjectConfig {
     geometries: any[]
@@ -24,6 +25,8 @@ interface ProjectConfig {
     restrictions: any[]
     loads: any[]
     load_cases: any[]
+    post_elem_mass?: any
+    post_releve_t_reactions?: any
 }
 
 export default function StructuralWorkspace({
@@ -38,7 +41,9 @@ export default function StructuralWorkspace({
         materials: [],
         restrictions: [],
         loads: [],
-        load_cases: []
+        load_cases: [],
+        post_elem_mass: { mass_calculations: [] },
+        post_releve_t_reactions: { reaction_extraction: { enabled: true } }
     })
 
     // DEBUG LOG
@@ -343,68 +348,72 @@ export default function StructuralWorkspace({
         { id: 'material' as Tab, label: 'Material', icon: '⚙️' },
         { id: 'restrictions' as Tab, label: 'Restrictions', icon: '🔒' },
         { id: 'loads' as Tab, label: 'Loads', icon: '⚡' },
-        { id: 'loadcases' as Tab, label: 'Load Cases', icon: '📊' }
+        { id: 'loadcases' as Tab, label: 'Load Cases', icon: '📊' },
+        { id: 'verification' as Tab, label: 'Verification', icon: '✅' }
     ]
 
     return (
-        <div className="h-full w-full flex flex-col bg-slate-900">
+        <div className="h-full w-full flex flex-col bg-slate-950 font-sans">
             {/* Toolbar */}
-            <div className="h-14 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-3 shrink-0">
+            <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-4 gap-3 shrink-0">
                 <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={onBack}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors uppercase text-[10px] font-black tracking-widest"
                 >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span className="text-sm font-medium">Back</span>
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Terminal</span>
                 </motion.button>
 
-                <div className="h-8 w-px bg-slate-700" />
+                <div className="h-8 w-px bg-slate-800" />
 
                 <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleOpenFolder}
                     disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2 bg-cyan-600 hover:bg-cyan-500 border border-cyan-400 text-slate-950 font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50"
                 >
                     <FolderOpen className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                        {isLoading ? 'Opening...' : 'Open Project'}
+                    <span>
+                        {isLoading ? 'Scanning...' : 'Open Project'}
                     </span>
                 </motion.button>
 
                 {projectPath && (
                     <>
                         <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={handleSaveProject}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-slate-950 font-black text-[10px] uppercase tracking-widest transition-all"
                         >
                             <Save className="w-4 h-4" />
-                            <span className="text-sm font-medium">Save Project</span>
+                            <span>Save Project</span>
                         </motion.button>
 
                         <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={handleRunSimulation}
                             disabled={simulationRunning}
-                            className={`flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors ${simulationRunning ? 'opacity-50' : ''}`}
+                            className={`flex items-center gap-2 px-5 py-2 bg-orange-600 hover:bg-orange-500 border border-orange-400 text-slate-950 font-black text-[10px] uppercase tracking-widest transition-all ${simulationRunning ? 'opacity-50' : ''}`}
                         >
                             <Play className="w-4 h-4" />
-                            <span className="text-sm font-medium">
-                                {simulationRunning ? 'Running...' : 'Run Simulation'}
+                            <span>
+                                {simulationRunning ? 'Job_Running...' : 'Run Simulation'}
                             </span>
                         </motion.button>
                     </>
                 )}
 
                 {projectPath && (
-                    <div className="ml-auto text-sm text-slate-400 font-mono truncate max-w-md">
-                        {projectPath}
+                    <div className="ml-auto flex items-center gap-4">
+                        <div className="h-8 w-[1px] bg-slate-800" />
+                        <div className="text-[10px] text-slate-500 font-mono tracking-tighter truncate max-w-md uppercase italic">
+                            PATH: {projectPath}
+                        </div>
                     </div>
                 )}
             </div>
@@ -412,37 +421,49 @@ export default function StructuralWorkspace({
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
                 {!projectPath ? (
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                        <FolderOpen className="w-24 h-24 text-slate-600 mb-6" />
-                        <h2 className="text-2xl font-semibold text-slate-400 mb-2">
-                            No Project Selected
+                    <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                        <FolderOpen className="w-20 h-20 text-slate-700 mb-6" />
+                        <h2 className="text-sm font-black text-slate-600 uppercase tracking-[0.4em] mb-2">
+                            Null_Workspace_Detected
                         </h2>
-                        <p className="text-slate-500 text-center max-w-md">
-                            Click "Open Project" to select a folder containing your geometry
-                            and mesh files.
+                        <p className="text-[10px] font-mono text-slate-700 text-center max-w-sm">
+                            Initiate project sequence. Load a workspace containing MED topology.
                         </p>
                     </div>
                 ) : (
                     <>
-                        {/* Tab Navigation */}
-                        <div className="w-48 bg-slate-800 border-r border-slate-700 p-4 space-y-2">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab === tab.id
-                                        ? 'bg-blue-600 text-white shadow-lg'
-                                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                                        }`}
-                                >
-                                    <span className="text-xl">{tab.icon}</span>
-                                    <span className="font-medium text-sm">{tab.label}</span>
-                                </button>
-                            ))}
+                        {/* Tab Navigation (Sidebar) */}
+                        <div className="w-52 bg-slate-900 border-r border-slate-800 flex flex-col">
+                            <div className="p-4 border-b border-slate-800 bg-slate-950/40">
+                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none">Modules_Selection</span>
+                            </div>
+                            <div className="flex-1 p-2 space-y-1 overflow-y-auto custom-scrollbar">
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`
+                                            w-full flex items-center gap-3 px-4 py-3 transition-all border
+                                            ${activeTab === tab.id
+                                                ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[inset_0_0_20px_rgba(34,211,238,0.05)]'
+                                                : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
+                                            }`}
+                                    >
+                                        <span className={`text-lg grayscale brightness-50 contrast-125 ${activeTab === tab.id ? 'grayscale-0 brightness-100' : ''}`}>{tab.icon}</span>
+                                        <span className="font-black text-[10px] uppercase tracking-widest">{tab.label}</span>
+                                        {activeTab === tab.id && (
+                                            <div className="ml-auto w-1 h-3 bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="p-4 border-t border-slate-800 bg-slate-950/40">
+                                <span className="text-[9px] font-mono text-slate-700 uppercase tracking-tighter">ProSolve_Core_v.0.9</span>
+                            </div>
                         </div>
 
                         {/* Tab Content */}
-                        <div className="flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-hidden bg-slate-950">
                             {activeTab === 'model' && (
                                 <ModelConfig
                                     key={projectPath}
@@ -515,6 +536,22 @@ export default function StructuralWorkspace({
                                     availableGroups={availableGroups}
                                     initialLoadCases={projectConfig.load_cases}
                                     onUpdate={updateLoadCases}
+                                />
+                            )}
+                            {activeTab === 'verification' && (
+                                <VerificationConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    config={{
+                                        mass: projectConfig.post_elem_mass,
+                                        reactions: projectConfig.post_releve_t_reactions
+                                    }}
+                                    onUpdate={(type, data) => {
+                                        setProjectConfig(prev => ({
+                                            ...prev,
+                                            [type === 'mass' ? 'post_elem_mass' : 'post_releve_t_reactions']: data
+                                        }))
+                                    }}
                                 />
                             )}
                         </div>

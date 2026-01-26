@@ -225,11 +225,16 @@ with output_buffer as f:
 
     if defi_mat_data or affe_mat_data["items"]:
         if defi_mat_data:
-            f.write(tpl_defi.render(definitions=defi_mat_data))
-            f.write("\n\n\n\n")
+            f.write(tpl_defi.render(definitions=defi_mat_data) + "\n\n\n\n")
+            
+            # Robustness: if we have materials but NO assignments, 
+            # create a default assignment to TOUT='OUI' using the first material
+            if not affe_mat_data["items"]:
+                first_mat_var = defi_mat_data[0]["var_name"]
+                affe_mat_data["items"] = [{"mater": first_mat_var, "tout": "OUI"}]
+                
         if affe_mat_data["items"]:
-            f.write(tpl_affe.render(**affe_mat_data))
-            f.write("\n\n\n\n")
+            f.write(tpl_affe.render(**affe_mat_data) + "\n\n\n\n")
 
     if geom_data["cara_items"]:
         f.write(tpl_cara.render(**geom_data))
@@ -255,7 +260,7 @@ with output_buffer as f:
 
     if lc_data.get("runs"):
         has_shells = any(item.get("type") == "COQUE" for item in geom_data.get("cara_items", []))
-        f.write(tpl_results.render(has_shells=has_shells, **lc_data))
+        f.write(tpl_results.render(has_shells=has_shells, cara_items=geom_data.get("cara_items", []), **lc_data))
         f.write("\n\n\n\n")
 
     f.write("FIN()\n")

@@ -3,7 +3,11 @@
     AFFE=(
     {%- for item in items %}
         _F(
+            {%- if item.tout %}
+            TOUT='{{ item.tout }}',
+            {%- else %}
             GROUP_MA=({{ "'" + item.groups|join("', '") + "'" }}),
+            {%- endif %}
             MATER={{ item.mater }}
         ),
     {%- endfor %}

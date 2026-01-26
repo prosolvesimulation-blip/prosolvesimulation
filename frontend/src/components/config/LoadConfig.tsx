@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import {
+    Trash2,
+    Zap,
+    Globe,
+    Waves,
+    Settings2,
+    Database,
+    TrendingUp,
+    Info,
+    Boxes
+} from 'lucide-react'
 
 interface Load {
     id: string
@@ -23,6 +33,12 @@ interface LoadConfigProps {
     onUpdate?: (loads: any[]) => void
 }
 
+const LOAD_VARIANTS = {
+    'gravity': { label: 'Grav_Acceleration', icon: Globe, color: 'text-orange-500', btn: 'bg-orange-600', unit: 'm/s²' },
+    'force': { label: 'Nodal_Force', icon: Zap, color: 'text-emerald-500', btn: 'bg-emerald-600', unit: 'N' },
+    'pressure': { label: 'Surface_Pressure', icon: Waves, color: 'text-cyan-500', btn: 'bg-cyan-600', unit: 'Pa' }
+}
+
 export default function LoadConfig({
     projectPath,
     availableGroups = [],
@@ -30,13 +46,14 @@ export default function LoadConfig({
     onUpdate
 }: LoadConfigProps) {
     const [loads, setLoads] = useState<Load[]>([])
+    const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
     const isFirstRender = useRef(true)
+    const lastExportRef = useRef('')
 
-    // Load initial from props
+    // Persistence: Load from Props
     useEffect(() => {
         if (initialLoads.length > 0 && loads.length === 0) {
             const formatted = initialLoads.map((l, index) => {
-                // Map saved JSON back to UI state
                 let type: 'gravity' | 'force' | 'pressure' = 'force'
                 if (l.type === 'PESANTEUR') type = 'gravity'
                 else if (l.type === 'PRESSION') type = 'pressure'
@@ -57,11 +74,11 @@ export default function LoadConfig({
                 }
             })
             setLoads(formatted)
+            if (formatted.length > 0) setSelectedIdx(0)
         }
     }, [initialLoads])
 
-    const lastExportRef = useRef('')
-
+    // Sync to Parent
     useEffect(() => {
         if (isFirstRender.current) {
             isFirstRender.current = false
@@ -74,11 +91,7 @@ export default function LoadConfig({
                     return {
                         name: String(l.name || ''),
                         type: 'PESANTEUR',
-                        direction: [
-                            parseFloat(l.ax || '0'),
-                            parseFloat(l.ay || '0'),
-                            parseFloat(l.az || '-1')
-                        ],
+                        direction: [parseFloat(l.ax || '0'), parseFloat(l.ay || '0'), parseFloat(l.az || '-1')],
                         gravite: parseFloat(l.intensity || '9.81')
                     }
                 } else if (l.type === 'force') {
@@ -108,199 +121,280 @@ export default function LoadConfig({
         }
     }, [loads, onUpdate])
 
-    const addLoad = (type: 'gravity' | 'force' | 'pressure') => {
+    const addItem = (type: 'gravity' | 'force' | 'pressure') => {
         const newId = (loads.length + 1).toString()
-        const baseName = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'Force' : 'Pressure'
-
-        setLoads([
-            ...loads,
-            {
-                id: newId,
-                name: `${baseName}_${newId}`,
-                type,
-                group: availableGroups[0] || '',
-                fx: '0',
-                fy: '0',
-                fz: '0',
-                pressure: '0',
-                ax: '0',
-                ay: '0',
-                az: '-1',
-                intensity: '9.81'
-            }
-        ])
+        const suffix = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'LOAD' : 'PRESS'
+        const newItem: Load = {
+            id: newId,
+            name: `${suffix}_${newId}`,
+            type,
+            group: availableGroups[0] || '',
+            fx: '0', fy: '0', fz: '0', pressure: '0', ax: '0', ay: '0', az: '-1', intensity: '9.81'
+        }
+        setLoads([...loads, newItem])
+        setSelectedIdx(loads.length)
     }
 
-    const removeLoad = (id: string) => {
+    const removeItem = (id: string) => {
+        const idx = loads.findIndex(l => l.id === id)
         setLoads(loads.filter(l => l.id !== id))
+        if (selectedIdx === idx) setSelectedIdx(null)
     }
 
-    const updateLoad = (id: string, field: keyof Load, value: any) => {
+    const updateItem = (id: string, field: keyof Load, value: any) => {
         setLoads(loads.map(l => (l.id === id ? { ...l, [field]: value } : l)))
     }
 
-    if (!projectPath) {
-        return <div className="p-10 text-center text-slate-500">Please select a project.</div>
-    }
+    if (!projectPath) return <div className="p-10 text-center text-slate-500 font-mono italic uppercase tracking-widest">HALT: SESSION_ID_UNSET</div>
+
+    const selected = selectedIdx !== null ? loads[selectedIdx] : null
 
     return (
-        <div className="flex flex-col h-full w-full p-4">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-slate-200">Load Definitions</h3>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => addLoad('gravity')}
-                        className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg transition-colors text-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Acceleration
-                    </button>
-                    <button
-                        onClick={() => addLoad('force')}
-                        disabled={availableGroups.length === 0}
-                        className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors text-sm disabled:opacity-50"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Force
-                    </button>
-                    <button
-                        onClick={() => addLoad('pressure')}
-                        disabled={availableGroups.length === 0}
-                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors text-sm disabled:opacity-50"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Pressure
-                    </button>
+        <div className="flex h-full w-full bg-slate-950 border border-slate-800 overflow-hidden font-sans">
+            {/* Master: Load Inventory */}
+            <div className="w-[300px] shrink-0 border-r border-slate-800 flex flex-col bg-slate-900/10">
+                <div className="p-4 border-b border-slate-800 bg-slate-900/30">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-emerald-500" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Load_Register</span>
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-600 bg-slate-950 px-1.5 border border-slate-800">{loads.length}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                        {Object.entries(LOAD_VARIANTS).map(([k, v]) => (
+                            <button
+                                key={k}
+                                onClick={() => addItem(k as any)}
+                                className={`flex flex-col items-center justify-center p-2 border border-slate-800 bg-slate-950 hover:bg-slate-900 transition-all group`}
+                                title={`Add ${v.label}`}
+                            >
+                                <v.icon className={`w-3.5 h-3.5 ${v.color} mb-1 opacity-60 group-hover:opacity-100`} />
+                                <span className="text-[7px] font-black text-slate-600 uppercase truncate w-full text-center group-hover:text-slate-400">{v.label.split('_')[0]}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                    {loads.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center p-8 opacity-20 grayscale">
+                            <Zap className="w-10 h-10 mb-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-center">No_Loads_Simulated</span>
+                        </div>
+                    ) : (
+                        loads.map((l, idx) => {
+                            const isActive = selectedIdx === idx
+                            const Variant = LOAD_VARIANTS[l.type]
+                            return (
+                                <div
+                                    key={l.id}
+                                    onClick={() => setSelectedIdx(idx)}
+                                    className={`
+                                        relative group p-4 mb-2 cursor-pointer border transition-all
+                                        ${isActive ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-transparent border-transparent hover:bg-slate-800/40'}
+                                    `}
+                                >
+                                    <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${isActive ? 'bg-emerald-500' : 'bg-transparent'}`} />
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`text-xs font-black truncate ${isActive ? 'text-white' : 'text-slate-400'}`}>{l.name}</span>
+                                        <Variant.icon className={`w-3 h-3 ${Variant.color} opacity-40`} />
+                                    </div>
+                                    <div className="flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase">
+                                        <span className="truncate max-w-[150px]">{l.group || 'GLOBAL'}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeItem(l.id); }}
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        })
+                    )}
                 </div>
             </div>
 
-            {/* Loads List */}
-            <div className="space-y-4 flex-1 overflow-y-auto">
-                {loads.map((load) => (
-                    <div
-                        key={load.id}
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-4"
-                    >
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${load.type === 'gravity' ? 'bg-orange-500/20 text-orange-400' :
-                                        load.type === 'force' ? 'bg-green-500/20 text-green-400' :
-                                            'bg-blue-500/20 text-blue-400'
-                                        }`}>
-                                        {load.type === 'gravity' ? 'ACCELERATION' : load.type.toUpperCase()}
-                                    </span>
+            {/* Detail: Inspector */}
+            <div className="flex-1 flex flex-col relative bg-slate-950 overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none opacity-[0.02] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
+
+                {selected ? (
+                    <>
+                        {/* Detail Header */}
+                        <div className="h-24 shrink-0 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900/10">
+                            <div className="flex items-center gap-6">
+                                <div className={`p-4 border ${LOAD_VARIANTS[selected.type].color.replace('text', 'border')}/40 bg-slate-900`}>
+                                    {(() => {
+                                        const Icon = LOAD_VARIANTS[selected.type].icon
+                                        return <Icon className={`w-6 h-6 ${LOAD_VARIANTS[selected.type].color}`} />
+                                    })()}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">External_Stimulus</span>
+                                        <div className={`w-1.5 h-1.5 rounded-none animate-pulse outline outline-1 outline-offset-2 ${LOAD_VARIANTS[selected.type].btn.replace('bg-', 'bg-').replace('600', '500')} ${LOAD_VARIANTS[selected.type].btn.replace('bg-', 'outline-')}`} />
+                                    </div>
                                     <input
                                         type="text"
-                                        value={load.name}
-                                        onChange={(e) => updateLoad(load.id, 'name', e.target.value)}
-                                        className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-1 text-sm focus:outline-none focus:border-blue-500"
-                                        placeholder="Load Name"
+                                        value={selected.name}
+                                        onChange={(e) => updateItem(selected.id, 'name', e.target.value)}
+                                        className="bg-transparent text-2xl font-black text-white leading-none font-mono focus:outline-none focus:border-b-2 border-emerald-500 w-full"
                                     />
                                 </div>
+                            </div>
 
-                                {load.type !== 'gravity' && (
-                                    <div className="mb-3">
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">
-                                            Mesh Group
-                                        </label>
+                            <div className="flex gap-4 items-center">
+                                {selected.type !== 'gravity' && (
+                                    <div className="text-right">
+                                        <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Target_Boundary_Group</span>
                                         <select
-                                            value={load.group}
-                                            onChange={(e) => updateLoad(load.id, 'group', e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                                            value={selected.group}
+                                            onChange={(e) => updateItem(selected.id, 'group', e.target.value)}
+                                            className="bg-slate-900 border border-slate-800 text-xs font-bold text-white px-3 py-1.5 focus:outline-none focus:border-emerald-500"
                                         >
-                                            {availableGroups.map((group) => (
-                                                <option key={group} value={group}>
-                                                    {group}
-                                                </option>
+                                            <option value="" disabled>Select Target</option>
+                                            {availableGroups.map(g => (
+                                                <option key={g} value={g}>{g}</option>
                                             ))}
                                         </select>
                                     </div>
                                 )}
+                            </div>
+                        </div>
 
-                                {load.type === 'gravity' && (
-                                    <div className="grid grid-cols-4 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-1">
-                                                Intensity (m/s²)
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={load.intensity}
-                                                onChange={(e) => updateLoad(load.id, 'intensity', e.target.value)}
-                                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
-                                                placeholder="9.81"
+                        {/* Inspector Body */}
+                        <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
+                            <div className="max-w-4xl mx-auto space-y-12">
+                                {/* Parameters Console */}
+                                <section>
+                                    <div className="flex items-center gap-2 mb-8">
+                                        <Settings2 className="w-4 h-4 text-emerald-500" />
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Signal_Intensity_Console</h4>
+                                    </div>
+
+                                    {selected.type === 'gravity' && (
+                                        <div className="space-y-10">
+                                            <div className="grid grid-cols-1 gap-6">
+                                                <VectorInput
+                                                    label="Acceleration_Intensity"
+                                                    value={selected.intensity}
+                                                    unit="m/s²"
+                                                    onChange={(v) => updateItem(selected.id, 'intensity', v)}
+                                                    theme="ORANGE"
+                                                    fullWidth
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-6">
+                                                {(['ax', 'ay', 'az'] as const).map(dir => (
+                                                    <VectorInput
+                                                        key={dir}
+                                                        label={`Dir_${dir.slice(1).toUpperCase()}`}
+                                                        value={selected[dir]}
+                                                        unit="vec"
+                                                        onChange={(v) => updateItem(selected.id, dir, v)}
+                                                        theme="ORANGE"
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selected.type === 'force' && (
+                                        <div className="grid grid-cols-3 gap-6">
+                                            {(['fx', 'fy', 'fz'] as const).map(dir => (
+                                                <VectorInput
+                                                    key={dir}
+                                                    label={`Force_${dir.slice(-1).toUpperCase()}`}
+                                                    value={selected[dir]}
+                                                    unit="N"
+                                                    onChange={(v) => updateItem(selected.id, dir, v)}
+                                                    theme="EMERALD"
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {selected.type === 'pressure' && (
+                                        <div className="max-w-md">
+                                            <VectorInput
+                                                label="Surface_Pressure"
+                                                value={selected.pressure}
+                                                unit="Pa"
+                                                onChange={(v) => updateItem(selected.id, 'pressure', v)}
+                                                theme="CYAN"
+                                                fullWidth
                                             />
                                         </div>
-                                        {(['ax', 'ay', 'az'] as const).map((dir) => (
-                                            <div key={dir}>
-                                                <label className="block text-xs font-medium text-slate-400 mb-1">
-                                                    Dir {dir.slice(1).toUpperCase()}
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={load[dir]}
-                                                    onChange={(e) => updateLoad(load.id, dir, e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                    )}
+                                </section>
 
-                                {load.type === 'force' && (
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {(['fx', 'fy', 'fz'] as const).map((dir) => (
-                                            <div key={dir}>
-                                                <label className="block text-xs font-medium text-slate-400 mb-1">
-                                                    {dir.toUpperCase()} (N)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={load[dir]}
-                                                    onChange={(e) => updateLoad(load.id, dir, e.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500"
-                                                    placeholder="0"
-                                                />
+                                {/* Solver Context */}
+                                <div className="grid grid-cols-2 gap-6 pt-8 border-t border-slate-800">
+                                    <div className="p-6 bg-slate-900 border border-slate-800">
+                                        <div className="flex gap-4">
+                                            <Boxes className="w-5 h-5 text-slate-700 shrink-0" />
+                                            <div>
+                                                <h5 className="text-[10px] font-black text-white uppercase mb-2 tracking-widest">Mesh_Entity_Link</h5>
+                                                <p className="text-[9px] text-slate-600 font-mono leading-relaxed uppercase">
+                                                    {selected.group || 'GLOBAL_DOMAIN'} is currently selected as the active receiver for this Load command.
+                                                </p>
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
-                                )}
+                                    <div className="p-6 bg-emerald-500/5 border border-emerald-500/10">
+                                        <div className="flex gap-4">
+                                            <Database className="w-5 h-5 text-emerald-500 shrink-0" />
+                                            <div>
+                                                <h5 className="text-[10px] font-black text-emerald-400 uppercase mb-2 tracking-widest">Aster_Operator</h5>
+                                                <p className="text-[9px] text-slate-500 font-mono leading-relaxed">
+                                                    Interpreted by `AFFE_CHAR_MECA`. Force uses `FORCE_NODALE` or `FORCE_FACE`. Pressure uses `PRES_REP`.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                {load.type === 'pressure' && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">
-                                            Pressure (Pa)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={load.pressure}
-                                            onChange={(e) => updateLoad(load.id, 'pressure', e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2 p-4 bg-slate-900/50 border border-slate-800/50">
+                                    <Info className="w-3.5 h-3.5 text-slate-600" />
+                                    <span className="text-[9px] font-mono text-slate-600 uppercase italic">
+                                        Note: Simulation results depend on consistent load signs relative to the global axis system.
+                                    </span>
+                                </div>
                             </div>
-
-                            <button
-                                onClick={() => removeLoad(load.id)}
-                                className="ml-3 p-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
                         </div>
-                    </div>
-                ))}
-
-                {loads.length === 0 && (
-                    <div className="text-center text-slate-400 p-10">
-                        No loads defined. Click a button above to add loads.
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center opacity-20 filter grayscale">
+                        <Zap className="w-16 h-16 text-slate-500 mb-4" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">select_thermal_force_policy</span>
                     </div>
                 )}
             </div>
+        </div>
+    )
+}
+
+function VectorInput({ label, value, unit, onChange, theme, fullWidth }: { label: string, value: any, unit: string, onChange: (v: string) => void, theme?: 'EMERALD' | 'ORANGE' | 'CYAN', fullWidth?: boolean }) {
+    const colorClass = theme === 'ORANGE' ? 'text-orange-500' : theme === 'CYAN' ? 'text-cyan-400' : 'text-emerald-400'
+    const borderClass = theme === 'ORANGE' ? 'border-orange-500/30' : theme === 'CYAN' ? 'border-cyan-500/30' : 'border-emerald-500/30'
+
+    return (
+        <div className={`group relative bg-slate-950/50 border border-slate-800 p-6 transition-all hover:bg-slate-900 ${fullWidth ? 'w-full' : ''}`}>
+            <label className="block text-[9px] font-black text-slate-600 uppercase mb-3 tracking-tighter">
+                {label}
+            </label>
+            <div className="flex items-baseline gap-4">
+                <input
+                    type="text"
+                    value={value || '0'}
+                    onChange={(e) => onChange(e.target.value)}
+                    className={`w-full bg-transparent text-3xl font-black ${colorClass} font-mono focus:outline-none`}
+                />
+                <span className="text-[10px] font-black text-slate-700 tracking-widest">{unit}</span>
+            </div>
+            <div className={`absolute left-0 top-0 bottom-0 w-1 ${borderClass} bg-current opacity-0 group-hover:opacity-100 transition-opacity`} />
         </div>
     )
 }
