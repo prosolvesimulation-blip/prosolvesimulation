@@ -45,9 +45,10 @@ export default function StructuralWorkspace({
     const [availableGroups, setAvailableGroups] = useState<string[]>([]) // Group names
     const [nodeGroups, setNodeGroups] = useState<string[]>([])
     const [allGroupsData, setAllGroupsData] = useState<any>({}) // Full group metadata
-
     const [meshFiles, setMeshFiles] = useState<string[]>([])
     const [simulationRunning, setSimulationRunning] = useState(false)
+    // Adicione isso junto com os outros estados (ex: logo abaixo de meshFiles)
+    const [vtkGeometries, setVtkGeometries] = useState<any[]>([])
 
     // CONSOLIDATION PROTOCOL: Mesh DNA Pipeline Smart Consumer (Multi-Mesh)
     useEffect(() => {
@@ -110,6 +111,51 @@ export default function StructuralWorkspace({
         }
     }
 
+
+
+    useEffect(() => {
+        if (activeTab === '3d-view' && projectPath) {
+
+            // Define função interna assíncrona para garantir a ordem (1 -> 2)
+            const runVtkSequence = async () => {
+                try {
+                    // PASSO 1: Manda gerar e ESPERA (await) o backend responder
+                    const resGen = await fetch('/api/vtk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_path: projectPath })
+                    });
+
+                    if (!resGen.ok) {
+                        console.error('[VTK] Erro na geração:', resGen.statusText);
+                        return; // Para se der erro na geração
+                    }
+
+                    // PASSO 2: Busca os dados (Só executa depois que o passo 1 acabou)
+                    const resData = await fetch('/api/get_vtk_geometry', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ folder_path: projectPath })
+                    });
+
+                    const json = await resData.json();
+
+                    // PASSO 3: Guarda no Estado
+                    if (json.status === 'success') {
+                        console.log("📦 [PARENT] Dados prontos para entrega:", json.data);
+                        setVtkGeometries(json.data);
+                    }
+
+                } catch (err) {
+                    console.error('[VTK] Erro na sequência:', err);
+                }
+            };
+
+            runVtkSequence();
+        }
+    }, [activeTab, projectPath])
+
+
     const handleRunSimulation = async () => {
         if (!projectPath) return
         setSimulationRunning(true)
@@ -148,7 +194,13 @@ export default function StructuralWorkspace({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     folder_path: projectPath,
-                    config: projectConfig
+                    config: {
+                        ...projectConfig,
+                        meshes: meshFiles.map(f => ({
+                            name: f.split('.')[0].replace(/[- ]/g, '_'),
+                            filename: f
+                        }))
+                    }
                 })
             })
             const data = await response.json()
@@ -411,6 +463,8 @@ export default function StructuralWorkspace({
                                 <MaterialConfig
                                     key={projectPath}
                                     projectPath={projectPath}
+                                    availableGroups={availableGroups}
+                                    nodeGroups={nodeGroups}
                                     initialMaterials={projectConfig.materials}
                                     onUpdate={updateMaterials}
                                 />
@@ -430,7 +484,7 @@ export default function StructuralWorkspace({
                                 <VtkMeshViewer
                                     projectPath={projectPath}
                                     meshKey={Date.now()}
-                                    geometries={projectConfig.geometries}
+                                    geometries={vtkGeometries}
                                 />
                             )}
 
@@ -457,6 +511,8 @@ export default function StructuralWorkspace({
                                     key={projectPath}
                                     projectPath={projectPath}
                                     availableLoads={projectConfig.loads}
+                                    availableRestrictions={projectConfig.restrictions}
+                                    availableGroups={availableGroups}
                                     initialLoadCases={projectConfig.load_cases}
                                     onUpdate={updateLoadCases}
                                 />

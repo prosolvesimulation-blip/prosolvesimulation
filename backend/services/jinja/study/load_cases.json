@@ -1,3 +1,13 @@
 {
-    "load_cases": []
+    "load_cases": [
+        {
+            "name": "Case 1",
+            "loads": [
+                "PESANTEUR_1"
+            ],
+            "restrictions": [
+                "Restriction_1"
+            ]
+        }
+    ]
 }

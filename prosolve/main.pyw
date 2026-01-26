@@ -226,10 +226,10 @@ def run_simulation_async(folder_path):
         return False
 
     try:
-        # Chama o wrapper Python
+        # Chama o wrapper Python em um NOVO CONSOLE para ser visível
         subprocess.Popen([python_exe, script_path, export_file], 
                          close_fds=True, 
-                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                         creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0)
         return True
     except Exception as e:
         print(f"[API] Error triggering simulation: {e}")

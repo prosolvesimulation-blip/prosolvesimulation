@@ -1,3 +1,14 @@
 {
-    "materials": []
+    "materials": [
+        {
+            "name": "Steel_S355",
+            "E": 210000000000,
+            "nu": 0.3,
+            "rho": 7850,
+            "assignedGroups": [
+                "Group_Of_All_Faces",
+                "group_shell"
+            ]
+        }
+    ]
 }

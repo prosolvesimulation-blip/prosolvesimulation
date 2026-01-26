@@ -1,42 +1,44 @@
-{% for run in runs %}
-# --- Análise Mecânica: {{ run.case_name }} ---
-{{ run.result_name }} = MECA_STATIQUE(
-    CARA_ELEM={{ run.cara_elem }},
-    CHAM_MATER={{ run.cham_mater }},
+{{ result_name }} = MECA_STATIQUE(
+    CARA_ELEM={{ cara_elem }},
+    CHAM_MATER={{ cham_mater }},
     EXCIT=(
-    {%- for excit in run.excit_list %}
+    {%- for excit in excit_list %}
         _F(CHARGE={{ excit.charge }}, TYPE_CHARGE='{{ excit.type_charge }}'),
     {%- endfor %}
     ),
-    INFO={{ run.info }},
-    MODELE={{ run.modele }},
-    OPTION='{{ run.option }}',
+    INFO={{ info }},
+    MODELE={{ modele }},
+    OPTION='{{ option }}',
     SOLVEUR=_F(
-        {%- for key, val in run.solveur.items() %}
-        {{ key }}={{ val|tojson if val is string else val }}, # Simplificação
+        {%- for key, val in solveur.items() %}
+        {{ key }}={{ val|tojson if val is string else val }},
         {%- endfor %}
     ),
 );
 
-{% if run.reaction_extraction %}
-# --- Extração de Reações: {{ run.case_name }} ---
-{{ run.result_name }} = CALC_CHAMP(reuse={{ run.result_name }},
-                         RESULTAT={{ run.result_name }},
+
+
+{% if reaction_extraction %}
+{{ result_name }} = CALC_CHAMP(reuse={{ result_name }},
+                         RESULTAT={{ result_name }},
                          FORCE=('REAC_NODA',))
 
-REAC_{{ run.case_name }} = POST_RELEVE_T(ACTION=_F(OPERATION='EXTRACTION',
-                                          INTITULE='Reac_{{ run.case_name }}',
-                                          RESULTAT={{ run.result_name }},
+
+
+REAC_{{ name }} = POST_RELEVE_T(ACTION=_F(OPERATION='EXTRACTION',
+                                          INTITULE='Reac_{{ name }}',
+                                          RESULTAT={{ result_name }},
                                           NOM_CHAM='REAC_NODA',
-                                          GROUP_NO=({% for g in run.reaction_extraction.groups %}'{{ g }}'{{ ', ' if not loop.last }}{% endfor %}),
-                                          RESULTANTE={{ run.reaction_extraction.resultante }},
-                                          MOMENT={{ run.reaction_extraction.moment }},
+                                          GROUP_NO=({% for g in reaction_extraction.groups %}'{{ g }}'{{ ', ' if not loop.last }}{% endfor %}),
+                                          RESULTANTE=('DX','DY','DZ'),
+                                          MOMENT=('DRX','DRY','DRZ'),
                                           POINT=(0,0,0)))
 
-IMPR_TABLE(TABLE=REAC_{{ run.case_name }},
-           UNITE={{ run.reaction_extraction.unit }},
-           FORMAT='{{ run.reaction_extraction.format }}',
-           SEPARATEUR='{{ run.reaction_extraction.separator }}',
-           TITRE='REAC_{{ run.case_name }}')
+
+
+IMPR_TABLE(TABLE=REAC_{{ name }},
+           UNITE={{ reaction_extraction.unit }},
+           FORMAT='{{ reaction_extraction.format }}',
+           SEPARATEUR='{{ reaction_extraction.separator }}',
+           TITRE='REAC_{{ name }}')
 {% endif %}
-{% endfor %}

@@ -32,11 +32,17 @@ def build_load_cases(lc_list, meca_config, pes_data, ddl_data, model_name="MODEL
     base_config = meca_config.get("meca_statique", {})
 
     for lc in lc_list:
-        case_name = lc.get("name", "CASE")
+        raw_name = lc.get("name", "CASE")
+        # Sanitize name: remove spaces and special chars for Python variable compatibility
+        case_name = raw_name.replace(" ", "_").replace("-", "_")
         result_name = f"RESU_{case_name}"
         
         excit_list_lc = []
-        for load_name in lc.get("loads", []):
+        
+        # Merge loads and restrictions from the case definition
+        combined_names = lc.get("loads", []) + lc.get("restrictions", [])
+        
+        for load_name in combined_names:
             # Validação: se o nome existe nos loads gerados
             if load_name in valid_names:
                 excit_list_lc.append({

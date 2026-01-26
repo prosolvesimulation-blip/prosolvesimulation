@@ -314,7 +314,7 @@ export default function ThreeDModel({ projectPath, geometries, meshes = [] }: Th
                 </Center>
                 <OrbitControls makeDefault />
             </Canvas>
-        </div>
+        </div >
     )
 }
 

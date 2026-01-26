@@ -5,6 +5,7 @@ import json
 from flask import Blueprint, jsonify, request, current_app
 import webview
 from jinja2 import Environment, FileSystemLoader
+import threading
 
 from services.vtk_converter import call_med_extractor
 
@@ -131,7 +132,7 @@ def init_aster_files(folder_path, mesh_files):
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
-                errors='ignore'
+                errors='replace'
             )
             if result.returncode != 0:
                 print(f"[ASTER] inspect_mesh.py failed: {result.stderr}")
@@ -394,118 +395,40 @@ def save_project():
         with open(project_file, 'w', encoding='utf-8') as f:
             json.dump(project_config, f, indent=4)
             
-        # 2. Decompose into component JSONs for generate_comm
-        # Ensure study dir exists
-        os.makedirs(study_dir, exist_ok=True)
+        # 2. Simplification: No longer need to decompose into multiple JSONs
+        # unless builders are updated to read main json (already done)
+        # We only need project.json to exist in the folder_path root
         
-        # A. Geometry (geometry.json)
-        with open(os.path.join(study_dir, "geometry.json"), 'w', encoding='utf-8') as f:
-            json.dump({"geometries": project_config.get("geometries", [])}, f, indent=4)
-            
-        # B. Materials (materials.json & assignments)
-        # Assuming frontend structure needs mapping
-        mats = project_config.get("materials", [])
-        # For now, separate props and assignments if needed, or update builders to read from one.
-        # Current builders expect materials.json (props) and material_assignments.json
-        # TODO: Refactor builders to unify? For now, we split.
-        
-        mat_props = []
-        mat_assigns = []
-        for m in mats:
-            if "props" in m:
-                mat_props.append(m["props"]) # {Name: Steel, E: 210000...}
-            if "assignment" in m:
-                mat_assigns.append(m["assignment"]) # {group: 'All', material: 'Steel'}
-                
-        # Fallback if frontend structure differs (likely array of objects with both)
-        # Let's assume frontend sends { name, E, nu, rho, groups: [] }
-        # We need to adapt.
-        # But wait, implementation plan said we'd analyze LoadConfig, but backend builders exist.
-        # Let's verify structure later. For now, dump raw materials to materials.json
-        # and assume generate_comm will likely fail if structure mismatched.
-        # FIX: We will dump what we have.
-        with open(os.path.join(study_dir, "materials.json"), 'w', encoding='utf-8') as f:
-            json.dump({"materials": mats}, f, indent=4)
-            
-        # C. Restrictions (ddl_impo.json)
-        with open(os.path.join(study_dir, "ddl_impo.json"), 'w', encoding='utf-8') as f:
-            json.dump({"ddl_impo": project_config.get("restrictions", [])}, f, indent=4)
-            
-        # D. Loads -> Split into Pesanteur, Force Nodale, Pressure
-        loads = project_config.get("loads", [])
-        pes_list = []
-        nod_list = []
-        pres_list = []
-        
-        for l in loads:
-            if l.get("type") == "PESANTEUR":
-                pes_list.append(l)
-            elif l.get("type") == "FORCE_NODALE":
-                nod_list.append(l)
-            elif l.get("type") == "PRESSION":
-                pres_list.append(l)
-                
-        # Pesanteur (Single object usually expected by builder, or list)
-        # Builder logic: if list, iterates.
-        with open(os.path.join(study_dir, "pesanteur.json"), 'w', encoding='utf-8') as f:
-            json.dump(pes_list[0] if pes_list else {}, f, indent=4)
-            
-        # Force Nodale
-        with open(os.path.join(study_dir, "force_nodale.json"), 'w', encoding='utf-8') as f:
-            json.dump({"force_nodale": nod_list}, f, indent=4)
-            
-        # Load Cases (load_cases.json)
-        # Ensure 'load_cases' exists in project config, else default
-        load_cases = project_config.get("load_cases", [])
-        if not load_cases and loads:
-             # Default LC if none defined but loads exist
-             load_cases = [{"name": "Default", "loads": [l["name"] for l in loads]}]
-             
-        with open(os.path.join(study_dir, "load_cases.json"), 'w', encoding='utf-8') as f:
-            json.dump({"load_cases": load_cases}, f, indent=4)
-            
         # 3. Run generate_comm.py
         script_path = os.path.join(os.path.dirname(BASE_DIR), "backend", "services", "jinja", "generate_comm.py")
+        print(f"[SAVE] Project Path: {folder_path}")
+        print(f"[SAVE] Script Path: {script_path}")
+        
         result = subprocess.run(
-            [sys.executable, script_path],
+            [sys.executable, script_path, "--project_path", folder_path],
             capture_output=True,
             text=True, 
-            encoding='utf-8'
+            encoding='utf-8',
+            errors='replace'
         )
         
+        if result.stdout: print(f"--- GENERATOR STDOUT ---\n{result.stdout}")
+        if result.stderr: print(f"--- GENERATOR STDERR ---\n{result.stderr}")
+        
         if result.returncode != 0:
-            print(f"Generate Comm Error: {result.stderr}")
-            return jsonify({"status": "warning", "message": "Saved, but generation failed: " + result.stderr})
+            return jsonify({"status": "warning", "message": f"Saved, but generation failed: {result.stderr}"})
             
-        # 4. Move generated outputs to project folder
-        # generated files are in services/jinja/output (calcul.comm)
-        # and services/jinja/output doesn't necessarily respect project path directly, it outputs to local output folder
-        # We need to move/copy them.
-        output_dir = os.path.join(os.path.dirname(BASE_DIR), "backend", "services", "jinja", "output")
         sim_dir = os.path.join(folder_path, "simulation_files")
         os.makedirs(sim_dir, exist_ok=True)
-        
-        import shutil
-        src_comm = os.path.join(output_dir, "calcul.comm")
-        dst_comm = os.path.join(sim_dir, "calcul.comm")
-        if os.path.exists(src_comm):
-            shutil.copy2(src_comm, dst_comm)
+        dst_comm = os.path.abspath(os.path.join(sim_dir, "calcul.comm"))
             
-        # 5. GENERATE EXPORT.EXPORT for SIMULATION
-        # Re-using logic from init_aster_files but pointing to calcul.comm
+        # 4. GENERATE EXPORT.EXPORT for SIMULATION
         jinja_dir = os.path.join(BASE_DIR, "services", "jinja", "templates")
         env = Environment(loader=FileSystemLoader(jinja_dir), trim_blocks=True, lstrip_blocks=True)
         tpl_export = env.get_template("export.j2")
         
-        # Prepare mesh list for export
-        # We need to read from the mesh.json that init_aster_files created (or update it)
-        sim_files_dir = os.path.join(folder_path, "simulation_files")
-        mesh_json_path = os.path.join(sim_files_dir, "mesh.json")
-        mesh_data_list = []
-        if os.path.exists(mesh_json_path):
-             with open(mesh_json_path, 'r') as f:
-                 mj = json.load(f)
-                 mesh_data_list = mj.get("meshes", [])
+        # Prepare mesh list for export from unified config
+        mesh_data_list = project_config.get("meshes", [])
         
         export_mesh_objs = []
         for i, m in enumerate(mesh_data_list):
@@ -516,19 +439,20 @@ def save_project():
                 "unit": 80 + i 
             })
             
-        temp_working_dir = os.path.join(sim_files_dir, "temp")
+        temp_working_dir = os.path.join(sim_dir, "temp")
         os.makedirs(temp_working_dir, exist_ok=True)
         
         export_content = tpl_export.render(
             temp_path=os.path.abspath(temp_working_dir),
-            comm_path=os.path.abspath(dst_comm), # Points to calcul.comm
+            comm_path=dst_comm, # Points to calcul.comm
             meshes=export_mesh_objs,
-            message_path=os.path.abspath(os.path.join(sim_files_dir, "message")),
-            base_path=os.path.abspath(os.path.join(sim_files_dir, "base")),
-            csv_path=None # Can be added if needed
+            message_path=os.path.abspath(os.path.join(sim_dir, "message")),
+            base_path=os.path.abspath(os.path.join(sim_dir, "base")),
+            resu_med_path=os.path.abspath(os.path.join(sim_dir, "resu.med")),
+            mass_csv_path=os.path.abspath(os.path.join(sim_dir, "mass_properties.csv")),
+            reactions_csv_path=os.path.abspath(os.path.join(sim_dir, "reactions.csv"))
         )
-        
-        export_file = os.path.join(sim_files_dir, "export.export")
+        export_file = os.path.join(sim_dir, "export.export")
         with open(export_file, "w", encoding="utf-8") as f:
             f.write(export_content)
             
@@ -567,40 +491,27 @@ def run_simulation():
         # Determine cwd (project folder or simulation_files?)
         # Usually where export is or where we want output
         
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8', 
-            errors='replace',
-            cwd=sim_dir
+        # Launch in a NEW CONSOLE and use cmd /k to keep window open after finish
+        cmd_open = ["cmd", "/k"] + cmd
+        print(f"[SIM] Launching Aster: {cmd_open}")
+        
+        subprocess.Popen(
+            cmd_open,
+            cwd=sim_dir,
+            creationflags=subprocess.CREATE_NEW_CONSOLE
         )
         
-        # We can implement streaming later. For now, wait and return.
-        stdout, stderr = process.communicate()
-        
-        print("--- SIMULATION STDOUT ---")
-        print(stdout)
-        print("--- SIMULATION STDERR ---")
-        print(stderr)
-        
-        if process.returncode == 0:
-            return jsonify({
-                "status": "success", 
-                "message": "Simulation Completed Successfully",
-                "output": stdout
-            })
-        else:
-            return jsonify({
-                "status": "error", 
-                "message": f"Simulation Failed (Code {process.returncode})",
-                "output": stdout + "\n" + stderr
-            })
+        return jsonify({
+            "status": "success", 
+            "message": "Simulation started. Console window will remain open for inspection."
+        })
             
     except Exception as e:
         print(f"[SIMULATION] Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 
 @api_blueprint.route('/open_project', methods=['POST'])
 def open_project_config():
@@ -622,6 +533,8 @@ def open_project_config():
         return jsonify({"status": "success", "config": config})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_blueprint.route('/get_mesh_data', methods=['POST'])
 def get_mesh_data():
     """Reads mesh data for visualization."""
@@ -652,6 +565,9 @@ def get_mesh_data():
     except Exception as e:
         print(f"[API] Mesh data error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 
 @api_blueprint.route('/get_mesh_vtk', methods=['POST'])
 def get_mesh_vtk():
@@ -724,6 +640,9 @@ def get_mesh_vtk():
         traceback.print_exc()
         print(f"[API] VTK mesh error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
 
 @api_blueprint.route('/get_hq_assembly', methods=['POST'])
 def get_hq_assembly():
@@ -802,55 +721,10 @@ def get_hq_assembly():
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@api_blueprint.route('/open_standalone_viewer', methods=['POST'])
-def open_standalone_viewer():
-    """
-    Triggers the standalone VTK viewer (native window).
-    """
-    try:
-        data = request.get_json()
-        folder_path = data.get('folder_path')
-        
-        if not folder_path or not os.path.exists(folder_path):
-            return jsonify({"status": "error", "message": "Invalid project path"}), 400
-            
-        # 1. ENSURE DATA EXISTS
-        json_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.json') and f != 'project.json']
-        target_json_path = None
-        
-        if not json_files:
-             med_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.med') and 'resu' not in f.lower()]
-             if med_files:
-                 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                 med_env_dir = os.path.join(os.path.dirname(project_root), "MEDCOUPLING-9.15.0", "MEDCOUPLING-9.15.0")
-                 mesher_script = os.path.join(project_root, "services", "med", "med_mesher.py")
-                 
-                 source_path = os.path.join(folder_path, med_files[0])
-                 cmd = f'cmd /c "cd /d {med_env_dir} && call env_launch.bat && python \"{mesher_script}\" \"{source_path}\""'
-                 print(f"[STANDALONE] Auto-Generating JSON from {med_files[0]}...")
-                 subprocess.run(cmd, shell=True, capture_output=True)
-                 target_json_path = source_path.replace('.med', '.json')
-        else:
-            for jf in json_files:
-                 if 'geometries' in jf: continue
-                 target_json_path = os.path.join(folder_path, jf)
-                 break
-        
-        if not target_json_path or not os.path.exists(target_json_path):
-             return jsonify({"status": "error", "message": "No suitable mesh JSON found or generated."}), 404
-             
-        # 2. LAUNCH VIEWER
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        viewer_script = os.path.join(project_root, "services", "med", "vtk_shell_extruder.py")
-        
-        cmd = [sys.executable, viewer_script, target_json_path]
-        print(f"[STANDALONE] Launching: {cmd}")
-        subprocess.Popen(cmd)
-        
-        return jsonify({"status": "success", "message": "Standalone viewer launched", "target": os.path.basename(target_json_path)})
-        
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
 
 @api_blueprint.route('/mesh_dna', methods=['POST'])
 def api_mesh_dna():
@@ -874,4 +748,85 @@ def api_mesh_dna():
 
     except Exception as e:
         print(f"[API] Mesh DNA Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+# No topo do routes.py
+from services.med.call_med_mesher import run_batch_med_processing
+
+@api_blueprint.route('/vtk', methods=['POST'])
+def generate_vtk():
+    data = request.json
+    project_path = data.get('project_path')
+
+    if not project_path or not os.path.exists(project_path):
+        return jsonify({"status": "error", "message": "Caminho inválido"}), 400
+
+    try:
+        # --- MUDANÇA AQUI: TIRA A THREAD ---
+        # Chamamos a função diretamente. O servidor vai ficar "travado" 
+        # aqui até o script terminar. Isso garante que quando retornar,
+        # os arquivos JSON já existem no disco.
+        run_batch_med_processing(project_path)
+
+        return jsonify({
+            "status": "success", 
+            "message": "Processamento concluído com sucesso."
+        })
+
+    except Exception as e:
+        print(f"Erro no processamento VTK: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+@api_blueprint.route('/get_vtk_geometry', methods=['POST'])
+def get_vtk_geometry():
+    """
+    Lê TODOS os arquivos .json da pasta.
+    SEM FILTROS. SEM VALIDAÇÃO DE CONTEÚDO.
+    """
+    data = request.get_json()
+    folder_path = data.get('folder_path') or data.get('project_path')
+
+    if not folder_path or not os.path.exists(folder_path):
+        return jsonify({"status": "error", "message": "Caminho inválido"}), 400
+
+    json_files = []
+    
+    try:
+        # Pega tudo que termina com .json
+        files = [f for f in os.listdir(folder_path) if f.lower().endswith('.json')]
+
+        for filename in files:
+            file_path = os.path.join(folder_path, filename)
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = json.load(f)
+
+                # Adiciona à lista independente do que tem dentro
+                json_files.append({
+                    "id": filename,
+                    "data": content
+                })
+                    
+            except Exception as read_err:
+                # Se o arquivo estiver corrompido e não for um JSON válido, avisa no log mas não trava
+                print(f"[API] Falha ao ler JSON {filename}: {read_err}")
+                continue
+
+        print(f"[API] Entregando {len(json_files)} arquivos JSON.")
+        
+        return jsonify({
+            "status": "success", 
+            "data": json_files
+        })
+
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

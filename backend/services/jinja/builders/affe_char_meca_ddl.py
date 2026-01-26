@@ -7,12 +7,14 @@ def build_affe_char_meca_ddl(ddl_list, model_name="MODELE", result_name="CHARGE_
     order_keys = ["DRX", "DRY", "DRZ", "DX", "DY", "DZ"]
 
     for item in ddl_list:
-        name = item.get("name", result_name)
-        input_params = item.get("params", {})
+        raw_name = item.get("name", result_name)
+        # Sanitize for Python variable compatibility
+        name = raw_name.replace(" ", "_").replace("-", "_")
+        input_params = item.get("dof") or item.get("params", {})
         
         active_params = []
         for key in order_keys:
-            if key in input_params:
+            if key in input_params and input_params[key] is not None:
                 active_params.append((key, input_params[key]))
 
         commands.append({

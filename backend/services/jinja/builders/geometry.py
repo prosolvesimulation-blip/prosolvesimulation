@@ -10,6 +10,10 @@ def build_geometry(geometry_list, model_name="MODELE", result_name="CARA_ELEM"):
     for item in geometry_list:
         group = item["group"]
         element_type = item.get("type", "Solid").upper()
+        
+        # Skip Node groups for AFFE_MODELE assignment
+        if element_type == "NODE" or item.get("_category") == "Node":
+            continue
 
         # Determine type: use explicit section_type if available (New Frontend), else guess from type (Legacy)
         section_type = item.get("section_type", "").upper()

@@ -1,0 +1,89 @@
+{
+    "geometries": [
+        {
+            "group": "fixed_node",
+            "_meshFile": "shell.med",
+            "type": "Node",
+            "phenomenon": "MECANIQUE",
+            "_category": "Node"
+        },
+        {
+            "group": "load_node",
+            "_meshFile": "shell.med",
+            "type": "Node",
+            "phenomenon": "MECANIQUE",
+            "_category": "Node"
+        },
+        {
+            "group": "12mm",
+            "_meshFile": "shell.med",
+            "type": "DKT",
+            "formulation": "DKT",
+            "phenomenon": "MECANIQUE",
+            "_category": "2D",
+            "section_type": "SHELL",
+            "profile_name": "Custom",
+            "section_params": {
+                "thickness": 10,
+                "offset": 0,
+                "vx": 1,
+                "vy": 0,
+                "vz": 0
+            }
+        }
+    ],
+    "materials": [
+        {
+            "name": "Steel_S355",
+            "E": 210000000000,
+            "nu": 0.3,
+            "rho": 7850,
+            "assignedGroups": [
+                "12mm"
+            ]
+        }
+    ],
+    "restrictions": [
+        {
+            "name": "Restriction_1",
+            "group": "fixed_node",
+            "dof": {
+                "DX": 0,
+                "DY": 0,
+                "DZ": 0,
+                "DRX": 0,
+                "DRY": 0,
+                "DRZ": 0
+            }
+        }
+    ],
+    "loads": [
+        {
+            "name": "ACCEL_1",
+            "type": "PESANTEUR",
+            "direction": [
+                0,
+                0,
+                -1
+            ],
+            "gravite": 1000
+        }
+    ],
+    "load_cases": [
+        {
+            "name": "Case 1",
+            "loads": [
+                "ACCEL_1"
+            ],
+            "restrictions": [
+                "Restriction_1"
+            ]
+        }
+    ],
+    "meshes": [
+        {
+            "name": "shell",
+            "filename": "shell.med"
+        }
+    ]
+}

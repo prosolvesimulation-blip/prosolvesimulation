@@ -10,6 +10,10 @@ interface Load {
     fy?: string
     fz?: string
     pressure?: string
+    ax?: string
+    ay?: string
+    az?: string
+    intensity?: string
 }
 
 interface LoadConfigProps {
@@ -45,7 +49,11 @@ export default function LoadConfig({
                     fx: l.fx?.toString() || '0',
                     fy: l.fy?.toString() || '0',
                     fz: l.fz?.toString() || '0',
-                    pressure: l.pressure?.toString() || '0'
+                    pressure: l.pressure?.toString() || '0',
+                    ax: l.direction?.[0]?.toString() || '0',
+                    ay: l.direction?.[1]?.toString() || '0',
+                    az: l.direction?.[2]?.toString() || '-1',
+                    intensity: l.gravite?.toString() || '9.81'
                 }
             })
             setLoads(formatted)
@@ -66,8 +74,12 @@ export default function LoadConfig({
                     return {
                         name: String(l.name || ''),
                         type: 'PESANTEUR',
-                        direction: [0, 0, -1],
-                        gravity: 9.81
+                        direction: [
+                            parseFloat(l.ax || '0'),
+                            parseFloat(l.ay || '0'),
+                            parseFloat(l.az || '-1')
+                        ],
+                        gravite: parseFloat(l.intensity || '9.81')
                     }
                 } else if (l.type === 'force') {
                     return {
@@ -98,7 +110,7 @@ export default function LoadConfig({
 
     const addLoad = (type: 'gravity' | 'force' | 'pressure') => {
         const newId = (loads.length + 1).toString()
-        const baseName = type === 'gravity' ? 'PESANTEUR' : type === 'force' ? 'Force' : 'Pressure'
+        const baseName = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'Force' : 'Pressure'
 
         setLoads([
             ...loads,
@@ -110,7 +122,11 @@ export default function LoadConfig({
                 fx: '0',
                 fy: '0',
                 fz: '0',
-                pressure: '0'
+                pressure: '0',
+                ax: '0',
+                ay: '0',
+                az: '-1',
+                intensity: '9.81'
             }
         ])
     }
@@ -138,7 +154,7 @@ export default function LoadConfig({
                         className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg transition-colors text-sm"
                     >
                         <Plus className="w-4 h-4" />
-                        Gravity
+                        Acceleration
                     </button>
                     <button
                         onClick={() => addLoad('force')}
@@ -173,7 +189,7 @@ export default function LoadConfig({
                                         load.type === 'force' ? 'bg-green-500/20 text-green-400' :
                                             'bg-blue-500/20 text-blue-400'
                                         }`}>
-                                        {load.type.toUpperCase()}
+                                        {load.type === 'gravity' ? 'ACCELERATION' : load.type.toUpperCase()}
                                     </span>
                                     <input
                                         type="text"
@@ -204,9 +220,34 @@ export default function LoadConfig({
                                 )}
 
                                 {load.type === 'gravity' && (
-                                    <p className="text-xs text-slate-500">
-                                        Self-weight load (Direction: -Z, g = 9.81 m/s²)
-                                    </p>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-1">
+                                                Intensity (m/s²)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={load.intensity}
+                                                onChange={(e) => updateLoad(load.id, 'intensity', e.target.value)}
+                                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
+                                                placeholder="9.81"
+                                            />
+                                        </div>
+                                        {(['ax', 'ay', 'az'] as const).map((dir) => (
+                                            <div key={dir}>
+                                                <label className="block text-xs font-medium text-slate-400 mb-1">
+                                                    Dir {dir.slice(1).toUpperCase()}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={load[dir]}
+                                                    onChange={(e) => updateLoad(load.id, dir, e.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
 
                                 {load.type === 'force' && (

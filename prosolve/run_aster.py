@@ -64,26 +64,29 @@ def executar_simulacao():
     print(f"[INFO] Executando Code_Aster...")
 
     try:
-        # 4. Executar o Comando
+        # 4. Executar o Comando - Use shell=True for Code_Aster on Windows
+        # We don't capture output anymore so it goes directly to the console window
+        print(f"[INFO] Launching Aster...")
         processo = subprocess.run(
             [aster_bin, export_path],
             cwd=working_dir,
-            shell=True,
-            capture_output=True,
-            text=True
+            shell=True
         )
 
         if processo.returncode == 0:
             print("\n[SUCESSO] O Code_Aster finalizou a execução.")
         else:
             print(f"\n[FALHA] O Code_Aster retornou código de erro: {processo.returncode}")
-            print("--- STDERR ---")
-            print(processo.stderr)
-            print("--- STDOUT ---")
-            # print(processo.stdout[-1000:]) # Opcional: mostrar final do log
+        
+        # Keep window open for inspection
+        print("\n" + "="*40)
+        print("SIMULATION FINISHED. Window kept open for inspection.")
+        print("="*40)
+        input("Press Enter to close this window...")
 
     except Exception as e:
         print(f"\n[CRITICO] Erro inesperado: {e}")
+        input("Press Enter to close this window...")
 
 if __name__ == "__main__":
     executar_simulacao()

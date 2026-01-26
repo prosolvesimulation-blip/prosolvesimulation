@@ -11,13 +11,13 @@ def build_defi_materiau(materials_list):
         clean_name = mat["name"].upper().replace(" ", "_")
         var_name = f"M_{clean_name}"
 
-        props = mat.get("props", {})
+        props = mat # The unified config is flat
         
         definitions.append({
             "var_name": var_name,
             "E": props.get("E"),
-            "NU": props.get("NU"),
-            "RHO": props.get("RHO")
+            "NU": props.get("nu") or props.get("NU"),
+            "RHO": props.get("rho") or props.get("RHO")
         })
 
     return definitions

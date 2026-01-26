@@ -12,6 +12,12 @@ R base {{ base_path }} R 0
 {% for mesh in meshes %}
 F mmed {{ mesh.path }} D {{ mesh.unit }}
 {% endfor %}
-{% if csv_path %}
-F dat {{ csv_path }} R 26
+{% if resu_med_path %}
+F resu {{ resu_med_path }} R 8
+{% endif %}
+{% if mass_csv_path %}
+F dat {{ mass_csv_path }} R 26
+{% endif %}
+{% if reactions_csv_path %}
+F dat {{ reactions_csv_path }} R 27
 {% endif %}

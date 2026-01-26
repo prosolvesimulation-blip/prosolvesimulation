@@ -1,0 +1,16 @@
+
+M_DUMMY = DEFI_MATERIAU(ELAS=_F(E=1.0, NU=0.3, RHO=1.0))
+
+CH_DUMMY = AFFE_MATERIAU(MODELE={{ model_name }},
+                         AFFE=_F(TOUT='OUI', MATER=M_DUMMY))
+
+TAB_GEOM = POST_ELEM(MODELE={{ model_name }},
+                    CHAM_MATER=CH_DUMMY,
+                    CARA_ELEM={{ cara_elem_name }},
+                    MASS_INER=_F(TOUT='OUI'))
+
+IMPR_TABLE(TABLE=TAB_GEOM,
+           UNITE=26,
+           FORMAT='TABLEAU',
+           SEPARATEUR=',',
+           TITRE='GEOMETRIC_PROPERTIES')

@@ -1,3 +1,16 @@
 {
-    "ddl_impo": []
+    "ddl_impo": [
+        {
+            "name": "Restriction_1",
+            "group": "Group_Of_All_Nodes",
+            "dof": {
+                "DX": 0,
+                "DY": 0,
+                "DZ": 0,
+                "DRX": null,
+                "DRY": null,
+                "DRZ": null
+            }
+        }
+    ]
 }
