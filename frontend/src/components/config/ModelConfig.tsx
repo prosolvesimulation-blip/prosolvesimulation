@@ -21,6 +21,7 @@ interface MeshGroup {
     category: string
     model: string
     phenomenon: string
+    medType?: string // NEW
 }
 
 interface ModelConfigProps {
@@ -92,9 +93,11 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                     const category = info.category || detectCategory(info.types || {})
                     if (category === 'Node' || category === 'Point') return
 
-                    const compStr = info.types ? Object.entries(info.types)
-                        .map(([t, q]) => `${t}:${q}`)
-                        .join(', ') : category
+                    const compStr = (info.types && Object.keys(info.types).length > 0)
+                        ? Object.entries(info.types)
+                            .map(([t, q]) => `${t}:${q}`)
+                            .join(', ')
+                        : category
 
                     const existingConfig = currentGeometries.find((c: any) => c.group === groupName && c._meshFile === fileName)
 
@@ -106,10 +109,12 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                         composition: compStr,
                         category: category,
                         model: existingConfig?.type || detectDefaultModel(category),
-                        phenomenon: 'MECANIQUE'
+                        phenomenon: 'MECANIQUE',
+                        medType: info.med_type // NEW
                     })
                 })
             })
+            console.log("DEBUG: [ModelConfig] Loaded groups with types:", loadedGroups.map(g => ({ name: g.name, type: g.medType })))
             setGroups(loadedGroups)
         }
     }, [meshGroups, currentGeometries])
@@ -303,9 +308,20 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                                             {g.category}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase">
-                                        <span className="truncate max-w-[100px] opacity-70" title={g.meshFile}>{g.meshFile}</span>
-                                        <span className="opacity-70 font-bold">{g.count} el.</span>
+                                    <div className="flex items-center gap-2 text-[8px] font-mono leading-none mt-1">
+                                        <span className="text-slate-600 truncate max-w-[70px]" title={g.meshFile}>{g.meshFile}</span>
+                                        <span className="w-1 h-1 rounded-full bg-slate-800 shrink-0" />
+                                        <span className="text-cyan-500 font-bold truncate max-w-[80px]" title={g.composition}>{g.composition}</span>
+                                        {g.medType && (
+                                            <>
+                                                <span className="w-1 h-1 rounded-full bg-slate-800 shrink-0" />
+                                                <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded-md">
+                                                    <span className="text-emerald-400 font-black uppercase text-[9px] tracking-wider">{g.medType}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        <div className="flex-1" />
+                                        <span className="text-slate-500 font-black shrink-0">{g.count} EL.</span>
                                     </div>
                                 </div>
                                 {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-cyan-500 rounded-l-full shadow-[0_0_10px_rgba(6,182,212,0.5)]" />}
@@ -422,6 +438,16 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                                                     <span className="text-3xl font-light text-white">{selectedGroup.count}</span>
                                                     <span className="block text-[9px] text-slate-500 font-mono uppercase mt-1">Total Elements</span>
                                                 </div>
+
+                                                {selectedGroup.medType && (
+                                                    <div className="pt-2">
+                                                        <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-2">Detected Element Type</span>
+                                                        <div className="inline-flex px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                                                            <span className="text-xl font-black text-emerald-400 tracking-tighter uppercase">{selectedGroup.medType}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <div className="h-px bg-white/5" />
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedGroup.composition.split(',').map(part => (

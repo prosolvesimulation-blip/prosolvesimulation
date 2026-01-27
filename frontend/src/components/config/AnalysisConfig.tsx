@@ -42,12 +42,12 @@ const AnalysisConfig: React.FC<AnalysisConfigProps> = ({ projectPath, initialAna
                 className="max-w-4xl mx-auto space-y-8"
             >
                 <div className="flex items-center gap-4 border-b border-slate-800 pb-6">
-                    <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                        <Settings size={24} className="text-purple-400" />
+                    <div className="p-3 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                        <Settings size={24} className="text-indigo-400" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">Analysis Type</h2>
-                        <p className="text-slate-400 text-xs font-medium uppercase tracking-widest opacity-60">Solver & Simulation Parameters</p>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">Analysis & Settings</h2>
+                        <p className="text-slate-400 text-xs font-medium uppercase tracking-widest opacity-60">Solver & Execution Parameters</p>
                     </div>
                 </div>
 
@@ -59,19 +59,19 @@ const AnalysisConfig: React.FC<AnalysisConfigProps> = ({ projectPath, initialAna
                             className={`
                                 flex items-start gap-4 p-5 rounded-2xl border transition-all text-left
                                 ${config.type === type.id
-                                    ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.1)]'
+                                    ? 'bg-indigo-500/10 border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.1)]'
                                     : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                                 }
                             `}
                         >
                             <div className={`
                                 p-2 rounded-lg
-                                ${config.type === type.id ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-500'}
+                                ${config.type === type.id ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-500'}
                             `}>
                                 <BarChart3 size={18} />
                             </div>
                             <div className="flex-1">
-                                <span className={`text-sm font-black uppercase tracking-wide ${config.type === type.id ? 'text-purple-300' : 'text-slate-200'}`}>
+                                <span className={`text-sm font-black uppercase tracking-wide ${config.type === type.id ? 'text-indigo-300' : 'text-slate-200'}`}>
                                     {type.label}
                                 </span>
                                 <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
@@ -79,70 +79,111 @@ const AnalysisConfig: React.FC<AnalysisConfigProps> = ({ projectPath, initialAna
                                 </p>
                             </div>
                             {config.type === type.id && (
-                                <CheckCircle2 size={16} className="text-purple-400" />
+                                <CheckCircle2 size={16} className="text-indigo-400" />
                             )}
                         </button>
                     ))}
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-                    <div className="flex items-center gap-2 text-slate-300">
-                        <Clock size={16} className="text-slate-500" />
-                        <h3 className="text-[10px] font-black uppercase tracking-widest">Advanced Parameters</h3>
-                    </div>
+                {/* --- EXECUTION SETTINGS --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+                        <div className="flex items-center gap-2 text-slate-300">
+                            <Clock size={16} className="text-slate-500" />
+                            <h3 className="text-[10px] font-black uppercase tracking-widest">Computational Strategy</h3>
+                        </div>
 
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-500 uppercase">Max Iterations</label>
-                            <input
-                                type="number"
-                                value={config.parameters.max_iter}
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value)
-                                    const newConfig = { ...config, parameters: { ...config.parameters, max_iter: val } }
-                                    setConfig(newConfig)
-                                    onUpdate(newConfig)
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-purple-500 outline-none transition-colors"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-500 uppercase">Precision</label>
-                            <input
-                                type="text"
-                                value={config.parameters.precision}
-                                onChange={(e) => {
-                                    const val = parseFloat(e.target.value)
-                                    const newConfig = { ...config, parameters: { ...config.parameters, precision: val } }
-                                    setConfig(newConfig)
-                                    onUpdate(newConfig)
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-purple-500 outline-none transition-colors"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-500 uppercase">Step Mode</label>
-                            <select
-                                value={config.parameters.time_stepping}
-                                onChange={(e) => {
-                                    const val = e.target.value
-                                    const newConfig = { ...config, parameters: { ...config.parameters, time_stepping: val } }
-                                    setConfig(newConfig)
-                                    onUpdate(newConfig)
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-purple-500 outline-none transition-colors appearance-none"
-                            >
-                                <option value="AUTO">Automatic</option>
-                                <option value="FIXED">Fixed Step</option>
-                                <option value="ADAPTIVE">Adaptive</option>
-                            </select>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Parallelization (NCPUS)</label>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="32"
+                                        value={config.parameters.ncpus || 1}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value)
+                                            const newConfig = { ...config, parameters: { ...config.parameters, ncpus: val } }
+                                            setConfig(newConfig)
+                                            onUpdate(newConfig)
+                                        }}
+                                        className="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    />
+                                    <span className="text-xs font-mono text-white bg-slate-950 px-2 py-1 rounded border border-white/5">{config.parameters.ncpus || 1}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Linear Solver Method</label>
+                                <select
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-indigo-500 outline-none transition-colors appearance-none"
+                                >
+                                    <option value="MULTIFRONT">Multifrontal (Direct)</option>
+                                    <option value="LDLT">LDLT (Direct Matrix)</option>
+                                    <option value="GMRES">GMRES (Iterative)</option>
+                                    <option value="PETSC">PETSc Parallel</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="p-4 bg-purple-500/5 rounded-xl border border-purple-500/10 flex items-start gap-3">
-                        <AlertTriangle size={14} className="text-purple-400 mt-0.5" />
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+                        <div className="flex items-center gap-2 text-slate-300">
+                            <BarChart3 size={16} className="text-slate-500" />
+                            <h3 className="text-[10px] font-black uppercase tracking-widest">Convergence & Output</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase">Max Iterations</label>
+                                <input
+                                    type="number"
+                                    value={config.parameters.max_iter}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value)
+                                        const newConfig = { ...config, parameters: { ...config.parameters, max_iter: val } }
+                                        setConfig(newConfig)
+                                        onUpdate(newConfig)
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-indigo-500 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase">Precision</label>
+                                <input
+                                    type="text"
+                                    value={config.parameters.precision}
+                                    onChange={(e) => {
+                                        const val = parseFloat(e.target.value)
+                                        const newConfig = { ...config, parameters: { ...config.parameters, precision: val } }
+                                        setConfig(newConfig)
+                                        onUpdate(newConfig)
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white focus:border-indigo-500 outline-none transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-white/5">
+                            <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block">Output Frequency</label>
+                            <div className="flex gap-2">
+                                {['Every Step', 'Final Only', 'Periodic'].map(opt => (
+                                    <button key={opt} className={`flex-1 py-1 px-2 border rounded-md text-[8px] font-black uppercase transition-all ${opt === 'Final Only' ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5' : 'border-white/5 text-slate-600 hover:text-slate-400'}`}>
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10 flex items-start gap-4">
+                    <AlertTriangle size={18} className="text-indigo-400 mt-1 shrink-0" />
+                    <div>
+                        <p className="text-[11px] font-bold text-indigo-300 uppercase mb-1">Solver Integrity Warning</p>
                         <p className="text-[10px] text-slate-400 leading-relaxed italic">
-                            Non-linear and bucking analyses may require special convergence criteria. Precision values between 1e-6 and 1e-8 are recommended for most industrial applications.
+                            Aumentar NCPUS reduz o tempo de processamento, mas requer licença do solver paralelizável e memória RAM compatível. Precision values between 1e-6 and 1e-8 are recommended for most industrial applications.
                         </p>
                     </div>
                 </div>

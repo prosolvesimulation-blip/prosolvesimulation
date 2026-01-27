@@ -67,3 +67,26 @@ This document maps the flow of data and the scripts involved in each functional 
  *   **Report Engine**: `report_service.py` (Uses `python-docx`)
  *   **Data Aggregator**: `routes.py` (Collects data from `project.json` and CSV results)
  *   **Pipeline**: `Selection + project.json` → `report_service.py` → `.docx file` → `User Open`
+ 
+ ---
+ 
+ ## 7. Command & Export Generation (.comm / .export)
+ **Goal**: Transform UI state into machine-readable instructions for the Code_Aster solver.
+ 
+ *   **Trigger**: Frontend `Save Project` button.
+ *   **API Route**: `/api/save_project` (in `routes.py`).
+ *   **Workflow**:
+     1.  **JSON Save**: Writes the master `project.json` to the project root.
+     2.  **Comm Gen**: Executes `generate_comm.py` (Python + Jinja2).
+         *   Reads `project.json`.
+         *   Uses `builders/` logic to prepare solver commands.
+         *   Renders `calcul.comm` using standard templates.
+     3.  **Export Gen**: `routes.py` renders the `export.j2` template.
+         *   Maps absolute paths for mesh files, message files, and result outputs.
+         *   Defines logical units (80, 81...) for the solver.
+ *   **Result**: Creates `calcul.comm` and `export.export` inside the `simulation_files/` directory.
+ *   **Python Builders** (`backend/services/jinja/builders/`):
+     *   `asse_maillage.py`, `affe_modele.py`, `defi_materiau.py`, `affe_materiau.py`, `geometry.py`, `affe_char_meca_ddl.py`, `pesanteur.py`, `load_cases.py`, `force_coque.py`, `force_nodale.py`, `post_elem_mass.py`, `post_releve_t_reactions.py`.
+ *   **Jinja2 Templates** (`backend/services/jinja/templates/`):
+     *   `preamble.j2`, `lire_maillage.j2`, `asse_maillage.j2`, `affe_modele.j2`, `defi_materiau.j2`, `affe_materiau.j2`, `affe_cara_elem.j2`, `affe_char_meca_ddl.j2`, `pesanteur.j2`, `load_cases.j2`, `force_nodale.j2`, `export.j2`, `extract_results.j2`, `post_elem_mass.j2`.
+ *   **Pipeline**: `UI State` → `project.json` → `generate_comm.py` + `export.j2` → `.comm + .export`

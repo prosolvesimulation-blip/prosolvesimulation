@@ -65,57 +65,14 @@ export default function StructuralWorkspace({
     const [simulationRunning, setSimulationRunning] = useState(false)
     const [vtkGeometries, setVtkGeometries] = useState<any[]>([])
 
-    // CONSOLIDATION PROTOCOL: Mesh DNA Pipeline Smart Consumer (Multi-Mesh)
+    // --- REDUNDANT: Removed to prevent overwriting of Unified Mesh Cargo (DNA + Inspeção) ---
+    /*
     useEffect(() => {
-        if (projectPath && meshFiles.length > 0) {
-            const medFiles = meshFiles.filter(f => f.toLowerCase().endsWith('.med'))
-            console.log(`[MeshDNA] Multi-Mesh Protocol: Detected ${medFiles.length} files.`)
-
-            medFiles.forEach(file => {
-                fetchMeshDNA(file)
-            })
-        }
+        if (projectPath && meshFiles.length > 0) { ... }
     }, [projectPath, meshFiles])
 
-    const fetchMeshDNA = async (fileName: string) => {
-        try {
-            const port = window.location.port || '3000'
-            console.log(`[MeshDNA] Fetching from Port: ${port}`)
-
-            const res = await fetch('/api/mesh_dna', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_path: `${projectPath}\\${fileName}` })
-            })
-            const result = await res.json()
-
-            if (result.status === 'success') {
-                const groups = result.data.groups
-                console.log(`[MeshDNA] Groups Received from ${fileName}:`, Object.keys(groups))
-
-                const globalWindow = window as any
-                if (!globalWindow.projectState) globalWindow.projectState = {}
-                if (!globalWindow.projectState.meshes) globalWindow.projectState.meshes = {}
-
-                globalWindow.projectState.meshes[fileName] = result.data
-
-                setAllGroupsData((prev: any) => ({
-                    ...prev,
-                    [fileName]: groups
-                }))
-
-                const newGroupNames = Object.keys(groups)
-                setAvailableGroups(prev => Array.from(new Set([...prev, ...newGroupNames])))
-
-                const newNodes = newGroupNames.filter(name => groups[name].category === 'Node')
-                setNodeGroups(prev => Array.from(new Set([...prev, ...newNodes])))
-
-                window.dispatchEvent(new Event('meshDataLoaded'))
-            }
-        } catch (error) {
-            console.error("[MeshDNA] Fetch failed:", error)
-        }
-    }
+    const fetchMeshDNA = async (fileName: string) => { ... }
+    */
 
     useEffect(() => {
         if (activeTab === '3d-view' && projectPath) {
@@ -292,37 +249,65 @@ export default function StructuralWorkspace({
                         setMeshFiles([])
                     }
 
-                    const groupsResp = await fetch('/api/read_mesh_groups', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ folder_path: data.path })
-                    })
-                    const groupsData = await groupsResp.json()
+                    // --- UNIFIED INGESTION PROTOCOL ---
+                    if (scanData.mesh_cargo) {
+                        const cargo = scanData.mesh_cargo;
+                        console.log("DEBUG: [Workspace] Unified Mesh Cargo detected:", cargo);
 
-                    if (groupsData.status === 'success' && groupsData.data && groupsData.data.groups) {
-                        const allGroups = groupsData.data.groups
-                        const groupNames = Object.keys(allGroups)
+                        const globalWindow = window as any;
+                        if (!globalWindow.projectState) globalWindow.projectState = {};
+                        globalWindow.projectState.meshes = cargo;
 
-                        // Categorize
-                        const nodes = groupNames.filter(n => allGroups[n].type === 'node')
-                        console.log("ROOT: Groups centralized (DNA-only mode):", { nodes, allCount: groupNames.length })
+                        // Transform for internal state hooks
+                        const allGroupsMerged: any = {};
+                        const groupNames: string[] = [];
+                        const nodeNames: string[] = [];
 
+                        Object.entries(cargo).forEach(([fileName, data]: [string, any]) => {
+                            const groups = data.groups;
+                            console.log(`DEBUG: [Workspace] Processing file ${fileName}, group count: ${Object.keys(groups).length}`);
+                            allGroupsMerged[fileName] = groups;
+
+                            Object.entries(groups).forEach(([gName, gInfo]: [string, any]) => {
+                                console.log(`DEBUG: [Workspace] Group ${gName} has med_type: ${gInfo.med_type}`);
+                                groupNames.push(gName);
+                                if (gInfo.category === 'Node') nodeNames.push(gName);
+                            });
+                        });
+
+                        setAllGroupsData(allGroupsMerged);
+                        setAvailableGroups(Array.from(new Set(groupNames)));
+                        setNodeGroups(Array.from(new Set(nodeNames)));
+
+                        // Update Project Geometries automatically
                         setProjectConfig(prev => {
-                            const newGeos = groupNames
-                                .filter(g => allGroups[g].type !== 'node')
+                            const newGeos = Array.from(new Set(groupNames))
+                                .filter(g => {
+                                    // Check any source file for this group's category
+                                    return !Object.values(allGroupsMerged).some((f: any) => f[g]?.category === 'Node');
+                                })
                                 .map(g => {
-                                    const existing = prev.geometries.find(ex => ex.group === g)
-                                    if (existing) return existing
+                                    const existing = prev.geometries.find(ex => ex.group === g);
+                                    if (existing) return existing;
+
+                                    // Find category for default type
+                                    let category = '3D';
+                                    for (const f of Object.values(allGroupsMerged) as any[]) {
+                                        if (f[g]) { category = f[g].category; break; }
+                                    }
 
                                     return {
                                         group: g,
-                                        type: '3D',
+                                        type: category === '1D' ? 'POU_D_T' : (category === '2D' ? 'COQUE_3D' : '3D'),
                                         phenomenon: 'MECANIQUE',
-                                        _category: '3D'
-                                    }
-                                })
-                            return { ...prev, geometries: newGeos }
-                        })
+                                        _category: category,
+                                        _meshFile: Object.keys(allGroupsMerged).find(f => allGroupsMerged[f][g])
+                                    };
+                                });
+                            return { ...prev, geometries: newGeos };
+                        });
+
+                        window.dispatchEvent(new Event('meshDataLoaded'));
                     }
                 }
             }
@@ -334,6 +319,7 @@ export default function StructuralWorkspace({
     }
 
     const tabs = [
+        { id: 'analysis' as Tab, label: 'Analysis & Settings', icon: '⚙️' },
         { id: 'mesh' as Tab, label: 'Mesh', icon: '🕸️' },
         { id: 'model' as Tab, label: 'Model', icon: '🏗️' },
         { id: 'material' as Tab, label: 'Material', icon: '⚙️' },
@@ -344,7 +330,6 @@ export default function StructuralWorkspace({
         { id: 'loads' as Tab, label: 'Loads', icon: '⚡' },
         { id: 'loadcases' as Tab, label: 'Load Cases', icon: '📊' },
         { id: '3d-view' as Tab, label: '3D View', icon: '🧊' },
-        { id: 'analysis' as Tab, label: 'Analysis', icon: '⚙️' },
         { id: 'verification' as Tab, label: 'Verification', icon: '⚖️' },
         { id: 'results' as Tab, label: 'Results', icon: '📈' },
         { id: 'report' as Tab, label: 'Report', icon: '📝' }
@@ -499,6 +484,7 @@ export default function StructuralWorkspace({
                                     key={projectPath}
                                     projectPath={projectPath}
                                     meshes={meshFiles}
+                                    meshGroups={allGroupsData}
                                 />
                             )}
                             {activeTab === 'material' && (

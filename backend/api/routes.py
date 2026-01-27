@@ -146,6 +146,40 @@ def get_verification_data():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def med_env_run(script_name, file_path):
+    """
+    General helper to run a script (med_extractor, med_inspecter, med_mesher)
+    inside the preparated SALOME environment.
+    """
+    script_path = os.path.join(ROOT_DIR, "backend", "services", "med", script_name)
+    if not os.path.exists(script_path):
+        # Fallback for script in ROOT
+        script_path = os.path.join(ROOT_DIR, script_name)
+        
+    try:
+        cmd = (
+            f'cmd /c "cd /d \"{MED_ENV_DIR}\" && '
+            f'call env_launch.bat && '
+            f'python \"{script_path}\" \"{file_path}\""'
+        )
+        print(f"[INGEST] Running {script_name}...")
+        result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+        
+        if result.returncode == 0:
+            output = result.stdout
+            print(f"[INGEST] Output from {script_name} (first 100 chars): {output[:100]}...")
+            if "__JSON_START__" in output and "__JSON_END__" in output:
+                json_str = output.split("__JSON_START__")[1].split("__JSON_END__")[0]
+                data = json.loads(json_str)
+                print(f"[INGEST] Successfully parsed JSON from {script_name}. Status: {data.get('status')}")
+                return data
+            print(f"[INGEST] ERROR: Markers not found in {script_name} output.")
+            return {"status": "error", "message": f"Malformed output in {script_name}"}
+        print(f"[INGEST] ERROR: Process {script_name} failed with code {result.returncode}")
+        return {"status": "error", "message": f"Process {script_name} failed: {result.stderr}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @api_blueprint.route('/open_folder_dialog', methods=['GET'])
 def open_folder_dialog():
     """Opens native Windows Folder Picker using PyWebView."""
@@ -173,9 +207,49 @@ def scan_workspace():
     try:
         files = os.listdir(folder_path)
         geo_files = [f for f in files if f.lower().endswith(('.step', '.stp'))]
-        mesh_files = [f for f in files if f.lower().endswith('.med') and f.lower() != 'resu.med']
+        mesh_files = [f for f in files if f.lower().endswith('.med') and 'resu' not in f.lower()]
         config_files = [f for f in files if f.lower().endswith('.comm')]
         
+        # --- NEW CONSOLIDATED INGESTION ---
+        mesh_cargo = {}
+        for m_file in mesh_files:
+            full_path = os.path.join(folder_path, m_file)
+            print(f"[INGEST] Processing {m_file}...")
+            
+            # 1. DNA (extractor)
+            dna = med_env_run("med_extractor.py", full_path)
+            # 2. Types (inspecter)
+            inspection = med_env_run("med_inspecter.py", full_path)
+            # 3. Connection/VTK (mesher)
+            mesher = med_env_run("med_mesher.py", full_path)
+            
+            # Merge logic
+            if dna.get("status") == "success":
+                groups = dna["data"]["groups"]
+                
+                # Enrich with Inspection Data
+                if inspection.get("status") == "success":
+                    inspect_groups = inspection["data"]["groups"]
+                    print(f"[INGEST] Inspection data found for {len(inspect_groups)} groups in {m_file}")
+                    for g_name, g_info in groups.items():
+                        if g_name in inspect_groups:
+                            med_type = inspect_groups[g_name].get("med_type", "Unknown")
+                            g_info["med_type"] = med_type
+                            print(f"[INGEST] Group '{g_name}' mapped to type '{med_type}'")
+                else:
+                    print(f"[INGEST] WARNING: Inspection failed for {m_file}: {inspection.get('message')}")
+                
+                # Enrich with Mesher Data (Points/Connectivity)
+                if mesher.get("status") == "success":
+                    mesher_groups = mesher["groups"]
+                    for g_name, g_info in groups.items():
+                        if g_name in mesher_groups:
+                            g_info["points"] = mesher_groups[g_name].get("points", [])
+                            g_info["connectivity"] = mesher_groups[g_name].get("connectivity", [])
+                
+                mesh_cargo[m_file] = dna["data"]
+                mesh_cargo[m_file]["filename"] = m_file
+
         result = {
             "status": "success",
             "geometry": len(geo_files) > 0,
@@ -185,17 +259,14 @@ def scan_workspace():
                 "geometry": geo_files,
                 "mesh": mesh_files,
                 "config": config_files,
-            }
+            },
+            "mesh_cargo": mesh_cargo # Unified data for Frontend
         }
-        
-        # Professional Refactor: Don't trigger Aster init automatically (too slow)
-        # The groups will be read on-the-fly via MEDCOUPLING when the component mounts.
-        # if mesh_files:
-        #     init_result = init_aster_files(folder_path, mesh_files)
-        #     result["aster_init"] = init_result
         
         return jsonify(result)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def init_aster_files(folder_path, mesh_files):
