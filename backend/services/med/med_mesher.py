@@ -45,8 +45,8 @@ def process_connectivity(raw_conn_flat, num_cells):
             
     return cleaned_connectivity
 
-def extract_and_save_mesh(file_path, output_dir):
-    """Extrai dados (Full + Groups), corrige conectividade e salva JSONs."""
+def extract_mesh_data(file_path):
+    """Extrai dados (Full + Groups), corrige conectividade e retorna dicionário."""
     
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"File not found: {file_path}"}
@@ -59,16 +59,15 @@ def extract_and_save_mesh(file_path, output_dir):
         mesh_name = mesh_names[0]
         
         # 1. PREPARAR DICIONÁRIO DE EXPORTAÇÃO
-        # Vamos coletar tudo que precisa ser salvo aqui
-        export_targets = {} # { suffix: data_dict }
+        export_targets = {} 
+        results = {}
 
         # --- A. MALHA COMPLETA (Base) ---
         try:
             full_mesh = ml.ReadUMeshFromFile(file_path, mesh_name, 0)
             if full_mesh.getNumberOfCells() > 0:
                 export_targets["_FULL_MESH_"] = full_mesh
-        except Exception as e:
-            print(f"[WARN] Full mesh read error: {e}")
+        except: pass
 
         # --- B. GRUPOS (Sub-malhas) ---
         group_names = ml.GetMeshGroupsNames(file_path, mesh_name)
@@ -79,32 +78,14 @@ def extract_and_save_mesh(file_path, output_dir):
                     export_targets[g_name] = sub_mesh
             except: pass
 
-        # 2. PROCESSAMENTO E SALVAMENTO
-        base_filename = os.path.splitext(os.path.basename(file_path))[0]
-        saved_files = []
-
+        # 2. PROCESSAMENTO
         for key, mesh_obj in export_targets.items():
-            # Extração de Dados Básicos
             num_cells = mesh_obj.getNumberOfCells()
             coords = mesh_obj.getCoords().toNumPyArray().flatten().tolist()
             
-            # --- O PULO DO GATO: CONECTIVIDADE ---
             conn_obj = mesh_obj.getNodalConnectivity()
             raw_conn = conn_obj.toNumPyArray().flatten().tolist()
-            
-            # APLICAR O FIX "SPIDERWEB" AQUI
-            # Transforma raw flat list em lista de listas limpa
             structured_connectivity = process_connectivity(raw_conn, num_cells)
-
-            # Normais
-            normals = None
-            d_mesh = mesh_obj.getMeshDimension()
-            category = {3: "3D", 2: "2D", 1: "1D"}.get(d_mesh, str(d_mesh) + "D")
-            if category == "2D":
-                try:
-                    norm_field = mesh_obj.buildOrthogonalField()
-                    normals = norm_field.getArray().toNumPyArray().flatten().tolist()
-                except: pass
 
             # VTK Type
             try:
@@ -113,70 +94,29 @@ def extract_and_save_mesh(file_path, output_dir):
                 vtk_type = mapping.get(mc_type, 5)
             except: vtk_type = 5
 
-            # Definição do Nome do Arquivo
-            if key == "_FULL_MESH_":
-                suffix = "" # shell.json
-            else:
-                safe_key = key.replace(" ", "_").replace("/", "-")
-                suffix = f"_{safe_key}" # shell_Group.json
-
-            final_name = f"{base_filename}{suffix}.json"
-            final_path = os.path.join(output_dir, final_name)
-
-            # Payload Final
-            payload = {
-                "status": "success",
-                "filename": os.path.basename(file_path),
-                "group_name": key,
+            results[key] = {
                 "points": coords,
-                "connectivity": structured_connectivity, # Agora está LIMPO e ESTRUTURADO
-                "normals": normals,
+                "connectivity": structured_connectivity,
                 "vtk_type": vtk_type,
                 "num_points": len(coords) // 3,
                 "num_elements": num_cells
             }
 
-            with open(final_path, 'w', encoding='utf-8') as f:
-                json.dump(payload, f, separators=(',', ':'))
-            
-            saved_files.append(final_name)
-            print(f"   -> Saved: {final_name} (Elem: {num_cells})")
-
-        return {"status": "success", "saved": saved_files}
+        return {"status": "success", "groups": results}
 
     except Exception as e:
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
-def process_directory(dir_path):
-    print(f"\n[START] Scanning directory: {dir_path}")
-    if not os.path.exists(dir_path):
-        print(f"[ABORT] Invalid path")
-        return
-
-    files = [f for f in os.listdir(dir_path) if f.lower().endswith('.med') and 'resu' not in f.lower()]
-    print(f"[FOUND] {len(files)} mesh files.\n")
-
-    for f_name in files:
-        full_path = os.path.join(dir_path, f_name)
-        print(f"[PROCESS] {f_name}...")
-        
-        result = extract_and_save_mesh(full_path, dir_path)
-        
-        if result["status"] == "error":
-            print(f"[ERROR] {f_name}: {result['message']}")
-
 if __name__ == "__main__":
-    # Caminho Padrão ou Argumento
+    # Silêncio Total (Apenas o JSON final no stdout, envolto em markers)
     if len(sys.argv) > 1:
         target = sys.argv[1]
         if os.path.isfile(target):
-            extract_and_save_mesh(target, os.path.dirname(target))
+            res = extract_mesh_data(target)
+            sys.stdout.write("__JSON_START__")
+            sys.stdout.write(json.dumps(res))
+            sys.stdout.write("__JSON_END__")
         else:
-            process_directory(target)
+            sys.stdout.write(json.dumps({"status": "error", "message": "Directory mode not supported"}))
     else:
-        # Default Hibrido
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        target_dir = os.path.join(base_dir, "testcases", "hibrido")
-        process_directory(target_dir)
-        
-    print("\n[FINISH] Processing completed.")
+        sys.stdout.write(json.dumps({"status": "error", "message": "No file path provided"}))

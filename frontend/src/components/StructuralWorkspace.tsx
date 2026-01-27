@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, FolderOpen, Save, Play } from 'lucide-react'
+import { ArrowLeft, FolderOpen, Save, Play, Box, Grid } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ModelConfig from './config/ModelConfig'
 import MaterialConfig from './config/MaterialConfig'
@@ -9,6 +9,11 @@ import GeometryConfig from './config/GeometryConfig'
 import LoadCaseConfig from './config/LoadCaseConfig'
 import MeshConfig from './config/MeshConfig'
 import VtkMeshViewer from './config/VtkMeshViewer'
+import PostProcessingTab from './config/PostProcessingTab'
+import ReportTab from './config/ReportTab'
+import AnalysisConfig from './config/AnalysisConfig'
+import ContactConfig from './config/ContactConfig'
+import ConnectionConfig from './config/ConnectionsConfig'
 import VerificationConfig from './config/VerificationConfig'
 
 interface StructuralWorkspaceProps {
@@ -17,7 +22,7 @@ interface StructuralWorkspaceProps {
     setProjectPath: (path: string | null) => void
 }
 
-type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'verification'
+type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report'
 
 interface ProjectConfig {
     geometries: any[]
@@ -25,6 +30,9 @@ interface ProjectConfig {
     restrictions: any[]
     loads: any[]
     load_cases: any[]
+    analysis?: any
+    contacts?: any[]
+    connections?: any[]
     post_elem_mass?: any
     post_releve_t_reactions?: any
 }
@@ -42,6 +50,9 @@ export default function StructuralWorkspace({
         restrictions: [],
         loads: [],
         load_cases: [],
+        analysis: { type: 'STATIQUE', parameters: { time_stepping: 'AUTO', max_iter: 20, precision: 1e-6 } },
+        contacts: [],
+        connections: [],
         post_elem_mass: { mass_calculations: [] },
         post_releve_t_reactions: { reaction_extraction: { enabled: true } }
     })
@@ -52,7 +63,6 @@ export default function StructuralWorkspace({
     const [allGroupsData, setAllGroupsData] = useState<any>({}) // Full group metadata
     const [meshFiles, setMeshFiles] = useState<string[]>([])
     const [simulationRunning, setSimulationRunning] = useState(false)
-    // Adicione isso junto com os outros estados (ex: logo abaixo de meshFiles)
     const [vtkGeometries, setVtkGeometries] = useState<any[]>([])
 
     // CONSOLIDATION PROTOCOL: Mesh DNA Pipeline Smart Consumer (Multi-Mesh)
@@ -62,7 +72,6 @@ export default function StructuralWorkspace({
             console.log(`[MeshDNA] Multi-Mesh Protocol: Detected ${medFiles.length} files.`)
 
             medFiles.forEach(file => {
-                // If not already in global state or if it's a new session
                 fetchMeshDNA(file)
             })
         }
@@ -70,8 +79,7 @@ export default function StructuralWorkspace({
 
     const fetchMeshDNA = async (fileName: string) => {
         try {
-            // Telemetry: Log Port (Protocol)
-            const port = window.location.port || '3000' // Frontend port representation
+            const port = window.location.port || '3000'
             console.log(`[MeshDNA] Fetching from Port: ${port}`)
 
             const res = await fetch('/api/mesh_dna', {
@@ -83,32 +91,25 @@ export default function StructuralWorkspace({
 
             if (result.status === 'success') {
                 const groups = result.data.groups
-
-                // Telemetry: Filtered Log (Protocol)
                 console.log(`[MeshDNA] Groups Received from ${fileName}:`, Object.keys(groups))
 
-                // Update Independent Global State (Protocol)
                 const globalWindow = window as any
                 if (!globalWindow.projectState) globalWindow.projectState = {}
                 if (!globalWindow.projectState.meshes) globalWindow.projectState.meshes = {}
 
-                // Store mesh data independently by filename
                 globalWindow.projectState.meshes[fileName] = result.data
 
-                // Update Independent Local UI States
                 setAllGroupsData((prev: any) => ({
                     ...prev,
                     [fileName]: groups
                 }))
 
-                // 🌟 Update Flat States for Tabs (Accumulation)
                 const newGroupNames = Object.keys(groups)
                 setAvailableGroups(prev => Array.from(new Set([...prev, ...newGroupNames])))
 
                 const newNodes = newGroupNames.filter(name => groups[name].category === 'Node')
                 setNodeGroups(prev => Array.from(new Set([...prev, ...newNodes])))
 
-                // Event Dispatch (Protocol)
                 window.dispatchEvent(new Event('meshDataLoaded'))
             }
         } catch (error) {
@@ -116,43 +117,32 @@ export default function StructuralWorkspace({
         }
     }
 
-
-
     useEffect(() => {
         if (activeTab === '3d-view' && projectPath) {
-
-            // Define função interna assíncrona para garantir a ordem (1 -> 2)
             const runVtkSequence = async () => {
                 try {
-                    // PASSO 1: Manda gerar e ESPERA (await) o backend responder
-                    const resGen = await fetch('/api/vtk', {
+                    console.log("[3D] Iniciando geração in-memory...");
+
+                    const res = await fetch('/api/3d/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ project_path: projectPath })
+                        body: JSON.stringify({
+                            project_path: projectPath,
+                            geometry_state: projectConfig.geometries
+                        })
                     });
 
-                    if (!resGen.ok) {
-                        console.error('[VTK] Erro na geração:', resGen.statusText);
-                        return; // Para se der erro na geração
-                    }
+                    const json = await res.json();
 
-                    // PASSO 2: Busca os dados (Só executa depois que o passo 1 acabou)
-                    const resData = await fetch('/api/get_vtk_geometry', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ folder_path: projectPath })
-                    });
-
-                    const json = await resData.json();
-
-                    // PASSO 3: Guarda no Estado
                     if (json.status === 'success') {
-                        console.log("📦 [PARENT] Dados prontos para entrega:", json.data);
+                        console.log("📦 [3D] Geometrias recebidas via stream:", json.data.length);
                         setVtkGeometries(json.data);
+                    } else {
+                        console.error('[3D] Falha na geração:', json.message);
                     }
 
                 } catch (err) {
-                    console.error('[VTK] Erro na sequência:', err);
+                    console.error('[3D] Erro na comunicação com backend:', err);
                 }
             };
 
@@ -165,8 +155,6 @@ export default function StructuralWorkspace({
         if (!projectPath) return
         setSimulationRunning(true)
         try {
-            // Auto save first? Maybe safer to ask user to save, but let's assume Save Project flow handles generation.
-            // We should ideally save first to ensure export is fresh.
             await handleSaveProject()
 
             const res = await fetch('/api/run_simulation', {
@@ -220,16 +208,11 @@ export default function StructuralWorkspace({
         }
     }
 
-    // Memoized update handlers to prevent infinite loops and DATA LOSS (Persistence Fix)
+    // Memoized update handlers
     const updateGeometries = useCallback((updatedGeos: any[]) => {
         setProjectConfig(prev => {
-            // Identify which domains (categories) this update represents
             const currentDomains = new Set(updatedGeos.map(g => g._category).filter(Boolean))
-
-            // If empty (e.g., initial load or deletion), we might need to be careful.
-            // But typical logic is: if update covers 1D/2D, we replace 1D/2D and KEEP 3D/0D.
             const preserved = prev.geometries.filter(g => !currentDomains.has(g._category))
-
             return {
                 ...prev,
                 geometries: [...preserved, ...updatedGeos]
@@ -253,6 +236,25 @@ export default function StructuralWorkspace({
         setProjectConfig(prev => ({ ...prev, load_cases: cases }))
     }, [])
 
+    const updateAnalysis = useCallback((analysis: any) => {
+        setProjectConfig(prev => ({ ...prev, analysis }))
+    }, [])
+
+    const updateContacts = useCallback((contacts: any[]) => {
+        setProjectConfig(prev => ({ ...prev, contacts }))
+    }, [])
+
+    const updateConnections = useCallback((connections: any[]) => {
+        setProjectConfig(prev => ({ ...prev, connections }))
+    }, [])
+
+    const updateVerification = useCallback((type: 'mass' | 'reactions', data: any) => {
+        setProjectConfig(prev => {
+            if (type === 'mass') return { ...prev, post_elem_mass: data }
+            return { ...prev, post_releve_t_reactions: data }
+        })
+    }, [])
+
 
     const handleOpenFolder = async () => {
         try {
@@ -262,19 +264,19 @@ export default function StructuralWorkspace({
 
             if (data.status === 'success' && data.path) {
                 setProjectPath(data.path)
-                setMeshFiles([]) // 🛡️ CRITICAL: Clear old files immediately to prevent Race Condition (Error 400)
+                setMeshFiles([])
 
-                // Try load config, but start with empty if not found
                 setProjectConfig({
                     geometries: [],
                     materials: [],
                     restrictions: [],
                     loads: [],
-                    load_cases: []
+                    load_cases: [],
+                    analysis: { type: 'STATIQUE', parameters: { time_stepping: 'AUTO', max_iter: 20, precision: 1e-6 } },
+                    contacts: [],
+                    connections: []
                 })
 
-                // 2. Trigger Scan & Inspection
-                // This will generate mesh.json, export.export and RUN inspect_mesh.py -> mesh_groups.json
                 setIsLoading(true)
                 const scanResp = await fetch('/api/scan_workspace', {
                     method: 'POST',
@@ -283,7 +285,6 @@ export default function StructuralWorkspace({
                 })
                 const scanData = await scanResp.json()
 
-                // 3. Read the generated groups (and list files from scanData)
                 if (scanData.status === 'success') {
                     if (scanData.files && scanData.files.mesh) {
                         setMeshFiles(scanData.files.mesh)
@@ -302,18 +303,10 @@ export default function StructuralWorkspace({
                         const allGroups = groupsData.data.groups
                         const groupNames = Object.keys(allGroups)
 
-                        // 🛡️ DATA PROTECTION: DNA protocol is now the source of truth for allGroupsData.
-                        // We do NOT overwrite it with potentially empty legacy scan results.
-                        // setAllGroupsData(allGroups)
-                        // setAvailableGroups(groupNames)
-
                         // Categorize
                         const nodes = groupNames.filter(n => allGroups[n].type === 'node')
-                        // setNodeGroups(nodes)
-
                         console.log("ROOT: Groups centralized (DNA-only mode):", { nodes, allCount: groupNames.length })
 
-                        // ALWAYS refresh geometries when groups are loaded
                         setProjectConfig(prev => {
                             const newGeos = groupNames
                                 .filter(g => allGroups[g].type !== 'node')
@@ -343,13 +336,18 @@ export default function StructuralWorkspace({
     const tabs = [
         { id: 'mesh' as Tab, label: 'Mesh', icon: '🕸️' },
         { id: 'model' as Tab, label: 'Model', icon: '🏗️' },
-        { id: 'geometry' as Tab, label: 'Geometry', icon: '📐' },
-        { id: '3d-view' as Tab, label: '3D View', icon: '🧊' },
         { id: 'material' as Tab, label: 'Material', icon: '⚙️' },
+        { id: 'geometry' as Tab, label: 'Geometry', icon: '📐' },
+        { id: 'connections' as Tab, label: 'Connections', icon: '🕸️' },
+        { id: 'contact' as Tab, label: 'Contact', icon: '🔗' },
         { id: 'restrictions' as Tab, label: 'Restrictions', icon: '🔒' },
         { id: 'loads' as Tab, label: 'Loads', icon: '⚡' },
         { id: 'loadcases' as Tab, label: 'Load Cases', icon: '📊' },
-        { id: 'verification' as Tab, label: 'Verification', icon: '✅' }
+        { id: '3d-view' as Tab, label: '3D View', icon: '🧊' },
+        { id: 'analysis' as Tab, label: 'Analysis', icon: '⚙️' },
+        { id: 'verification' as Tab, label: 'Verification', icon: '⚖️' },
+        { id: 'results' as Tab, label: 'Results', icon: '📈' },
+        { id: 'report' as Tab, label: 'Report', icon: '📝' }
     ]
 
     return (
@@ -365,6 +363,8 @@ export default function StructuralWorkspace({
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Terminal</span>
                 </motion.button>
+
+                <div className="h-8 w-px bg-slate-800" />
 
                 <div className="h-8 w-px bg-slate-800" />
 
@@ -457,6 +457,27 @@ export default function StructuralWorkspace({
                                     </button>
                                 ))}
                             </div>
+                            <div className="p-3 border-t border-slate-800 bg-slate-900/30 space-y-2">
+                                <div className="flex items-center justify-between px-1">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">External Apps</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => alert("Launching FreeCAD...")}
+                                        className="flex items-center justify-center gap-2 p-2 bg-slate-800/50 hover:bg-red-500/10 border border-slate-700 hover:border-red-500/30 rounded-lg group transition-all"
+                                    >
+                                        <Box className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-400 transition-colors" />
+                                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-red-300 uppercase">FreeCAD</span>
+                                    </button>
+                                    <button
+                                        onClick={() => alert("Launching Salome_Meca...")}
+                                        className="flex items-center justify-center gap-2 p-2 bg-slate-800/50 hover:bg-amber-500/10 border border-slate-700 hover:border-amber-500/30 rounded-lg group transition-all"
+                                    >
+                                        <Grid className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition-colors" />
+                                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-amber-300 uppercase">Salome</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div className="p-4 border-t border-slate-800 bg-slate-950/40">
                                 <span className="text-[9px] font-mono text-slate-700 uppercase tracking-tighter">ProSolve_Core_v.0.9</span>
                             </div>
@@ -501,14 +522,25 @@ export default function StructuralWorkspace({
                                 />
                             )}
 
-                            {activeTab === '3d-view' && (
-                                <VtkMeshViewer
+                            {activeTab === 'connections' && (
+                                <ConnectionConfig
+                                    key={projectPath}
                                     projectPath={projectPath}
-                                    meshKey={Date.now()}
-                                    geometries={vtkGeometries}
+                                    availableGroups={availableGroups}
+                                    nodeGroups={nodeGroups}
+                                    initialConnections={projectConfig.connections}
+                                    onUpdate={updateConnections}
                                 />
                             )}
-
+                            {activeTab === 'contact' && (
+                                <ContactConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    availableGroups={availableGroups}
+                                    initialContacts={projectConfig.contacts}
+                                    onUpdate={updateContacts}
+                                />
+                            )}
                             {activeTab === 'restrictions' && (
                                 <RestrictionConfig
                                     key={projectPath}
@@ -538,6 +570,21 @@ export default function StructuralWorkspace({
                                     onUpdate={updateLoadCases}
                                 />
                             )}
+                            {activeTab === '3d-view' && (
+                                <VtkMeshViewer
+                                    projectPath={projectPath}
+                                    meshKey={Date.now()}
+                                    geometries={vtkGeometries}
+                                />
+                            )}
+                            {activeTab === 'analysis' && (
+                                <AnalysisConfig
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                    initialAnalysis={projectConfig.analysis}
+                                    onUpdate={updateAnalysis}
+                                />
+                            )}
                             {activeTab === 'verification' && (
                                 <VerificationConfig
                                     key={projectPath}
@@ -546,12 +593,19 @@ export default function StructuralWorkspace({
                                         mass: projectConfig.post_elem_mass,
                                         reactions: projectConfig.post_releve_t_reactions
                                     }}
-                                    onUpdate={(type, data) => {
-                                        setProjectConfig(prev => ({
-                                            ...prev,
-                                            [type === 'mass' ? 'post_elem_mass' : 'post_releve_t_reactions']: data
-                                        }))
-                                    }}
+                                    onUpdate={updateVerification}
+                                />
+                            )}
+                            {activeTab === 'results' && (
+                                <PostProcessingTab
+                                    key={projectPath}
+                                    projectPath={projectPath}
+                                />
+                            )}
+                            {activeTab === 'report' && (
+                                <ReportTab
+                                    key={projectPath}
+                                    projectPath={projectPath}
                                 />
                             )}
                         </div>

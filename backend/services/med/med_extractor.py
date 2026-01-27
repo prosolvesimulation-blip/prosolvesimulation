@@ -155,7 +155,9 @@ if __name__ == "__main__":
     
     result_data = extract_med_data(input_med)
     
-    print(json.dumps(result_data, separators=(',', ':')))
+    sys.stdout.write("__JSON_START__")
+    sys.stdout.write(json.dumps(result_data, separators=(',', ':')))
+    sys.stdout.write("__JSON_END__")
     
     if output_json:
         with open(output_json, 'w', encoding='utf-8') as f:

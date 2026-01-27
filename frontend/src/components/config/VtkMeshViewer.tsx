@@ -10,8 +10,6 @@ import {
     Eye,
     EyeOff,
     Layers,
-    // FileJson, // <--- REMOVIDO PARA CORRIGIR O ERRO
-    MousePointer2,
     Grid
 } from 'lucide-react'
 
@@ -56,16 +54,21 @@ const VtkMeshViewer: React.FC<VtkMeshViewerProps> = ({ geometries }) => {
     // Estado para controlar quais objetos mostram as linhas (Edges/Grid)
     const [edgeVisibleIds, setEdgeVisibleIds] = useState<Set<string>>(new Set())
 
-    // Helper de Cores
-    const getMeshColor = (id: string) => {
-        const isExtrusion = id.includes('extrusion')
-        const isBeam = id.includes('beam')
+    // 🌟 NOVO: Controle de Opacidade por Objeto (0.0 to 1.0)
+    const [opacityMap, setOpacityMap] = useState<Record<string, number>>({})
+
+    // Helper de Cores (Refinados para Profissionalismo)
+    const getMeshColor = (id: string, isBase?: boolean) => {
+        const isExtrusion = id.includes('EXTRUSION') || id.includes('extrusion')
+        const isBeam = id.toLowerCase().includes('beam') || id.toLowerCase().includes('i300')
 
         if (isExtrusion) {
-            if (isBeam) return { r: 0.2, g: 0.8, b: 0.4, hex: '#33cc66', name: '3D Beam' }
-            else return { r: 0.2, g: 0.6, b: 1.0, hex: '#3399ff', name: '3D Shell' }
+            if (isBeam) return { r: 0.1, g: 0.8, b: 0.5, hex: '#10b981', name: '3D BEAM' } // Emerald 500
+            return { r: 0.2, g: 0.6, b: 0.9, hex: '#3b82f6', name: '3D SHELL' } // Blue 500
+        } else if (isBase) {
+            return { r: 1.0, g: 0.7, b: 0.0, hex: '#f59e0b', name: 'ORIGINAL_WIRE' } // Amber 500
         } else {
-            return { r: 1.0, g: 1.0, b: 0.0, hex: '#ffff00', name: 'Mesh Wire' }
+            return { r: 0.6, g: 0.6, b: 0.7, hex: '#94a3b8', name: 'SOLID_VOLUME' } // Slate 400
         }
     }
 
@@ -206,6 +209,15 @@ const VtkMeshViewer: React.FC<VtkMeshViewerProps> = ({ geometries }) => {
             actorsMap.current.set(id, actor)
         })
 
+        // Inicializa opacidade 100% para novos itens detectados
+        setOpacityMap(prev => {
+            const next = { ...prev }
+            geometries.forEach(g => {
+                if (next[g.id] === undefined) next[g.id] = 1.0
+            })
+            return next
+        })
+
         renderer.resetCamera()
         renderWindow.render()
 
@@ -219,42 +231,46 @@ const VtkMeshViewer: React.FC<VtkMeshViewerProps> = ({ geometries }) => {
         const { renderWindow } = context.current
 
         actorsMap.current.forEach((actor, id) => {
+            const meshItem = geometries.find(g => g.id === id)
+            const isBase = meshItem?.data?.is_base
+
             const prop = actor.getProperty()
-            const baseColor = getMeshColor(id)
-            const isExtrusion = id.includes('extrusion')
+            const baseColor = getMeshColor(id, isBase)
+            const isExtrusion = id.includes('EXTRUSION') || id.includes('extrusion')
 
             const isHidden = hiddenIds.has(id)
             const isSelected = selectedId === id
             const showEdges = edgeVisibleIds.has(id)
+            const userOpacity = opacityMap[id] !== undefined ? opacityMap[id] : 1.0
 
             actor.setVisibility(!isHidden)
             prop.setEdgeVisibility(showEdges)
-            prop.setEdgeColor(0, 0, 0)
+            prop.setEdgeColor(0.05, 0.05, 0.05) // Quase preto para o grid
 
             if (isSelected) {
-                prop.setColor(1.0, 0.4, 0.0)
-                prop.setAmbient(0.6)
+                prop.setColor(1.0, 0.45, 0.0) // Laranja Vibrante Maestro
+                prop.setAmbient(0.4)
                 prop.setDiffuse(0.8)
-                prop.setOpacity(1.0)
+                prop.setOpacity(Math.min(userOpacity, 1.0))
                 prop.setLineWidth(showEdges ? 3 : 1)
             } else {
                 prop.setColor(baseColor.r, baseColor.g, baseColor.b)
-                prop.setAmbient(0.1)
-                prop.setDiffuse(0.9)
+                prop.setAmbient(0.15)
+                prop.setDiffuse(0.85)
 
                 if (isExtrusion) {
                     prop.setRepresentationToSurface()
-                    prop.setOpacity(0.9)
+                    prop.setOpacity(userOpacity)
                     prop.setLineWidth(1)
                 } else {
-                    prop.setOpacity(1.0)
+                    prop.setOpacity(userOpacity)
                     prop.setLineWidth(2)
                 }
             }
         })
 
         renderWindow.render()
-    }, [hiddenIds, selectedId, edgeVisibleIds, geometries])
+    }, [hiddenIds, selectedId, edgeVisibleIds, opacityMap, geometries])
 
     // ------------------------------------------------------------------------
     // CONTROLADORES
@@ -310,95 +326,151 @@ const VtkMeshViewer: React.FC<VtkMeshViewerProps> = ({ geometries }) => {
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             />
 
-            {/* OVERLAY ESQUERDA */}
-            <div className="absolute top-4 left-4 w-72 flex flex-col gap-2 z-30 max-h-[calc(100%-100px)]">
-                <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-lg shadow-2xl overflow-hidden flex flex-col">
-                    <div className="px-3 py-2 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-slate-200">
-                            <Layers size={16} />
-                            <span className="text-xs font-bold uppercase tracking-wider">Scene Objects</span>
+            {/* OVERLAY ESQUERDA - GLASSMORPHISM PANEL */}
+            <div className="absolute top-4 left-4 w-[340px] flex flex-col gap-2 z-30 max-h-[calc(100%-80px)]">
+                <div className="bg-slate-950/80 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col">
+                    {/* Header do Painel */}
+                    <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-orange-500/20 rounded border border-orange-500/30">
+                                <Layers size={14} className="text-orange-400" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90">Scene_Inventory</span>
+                                <span className="text-[8px] font-mono text-slate-500 uppercase tracking-tighter">Geometric_Components_Stack</span>
+                            </div>
                         </div>
-                        <span className="text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full">
-                            {geometries?.length || 0}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const next: any = {}
+                                    geometries.forEach(g => next[g.id] = 1.0)
+                                    setOpacityMap(next)
+                                }}
+                                className="text-[8px] font-black text-slate-400 hover:text-white px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/5 transition-all uppercase"
+                                title="Reset all to 100% opaque"
+                            >
+                                Opaque
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-orange-500 bg-orange-500/10 px-2 py-0.5 border border-orange-500/20 rounded-full">
+                                {geometries?.length || 0}
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="p-2 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+                    {/* Lista de Objetos */}
+                    <div className="p-3 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
                         {geometries && geometries.length > 0 ? (
                             geometries.map((mesh) => {
-                                const color = getMeshColor(mesh.id)
+                                const isBase = mesh.data?.is_base
+                                const color = getMeshColor(mesh.id, isBase)
                                 const isHidden = hiddenIds.has(mesh.id)
                                 const isSelected = selectedId === mesh.id
                                 const isGridVisible = edgeVisibleIds.has(mesh.id)
+                                const currentOpacity = opacityMap[mesh.id] || 1.0
 
                                 return (
                                     <div
                                         key={mesh.id}
                                         onClick={() => toggleSelection(mesh.id)}
                                         className={`
-                                            group/item flex items-center gap-2 p-2 rounded cursor-pointer transition-all border
+                                            group/item flex flex-col gap-2 p-3 rounded-lg cursor-pointer transition-all border
                                             ${isSelected
-                                                ? 'bg-slate-800 border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.1)]'
-                                                : 'bg-transparent border-transparent hover:bg-slate-800 hover:border-slate-700'
+                                                ? 'bg-white/10 border-orange-500/50 shadow-[inset_0_0_20px_rgba(249,115,22,0.05)]'
+                                                : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
                                             }
-                                            ${isHidden ? 'opacity-50' : 'opacity-100'}
+                                            ${isHidden ? 'opacity-40 grayscale-[0.5]' : 'opacity-100'}
                                         `}
                                     >
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            {/* Botão de Visibilidade */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    toggleVisibility(mesh.id, e.altKey)
-                                                }}
-                                                className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
-                                                title="Toggle Visibility (Alt+Click to Isolate)"
-                                            >
-                                                {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-                                            </button>
+                                        <div className="flex items-center gap-3">
+                                            {/* Status Indicator */}
+                                            <div
+                                                className={`w-1.5 h-6 rounded-full transition-all ${isSelected ? 'bg-orange-500 shadow-[0_0_10px_#f97316]' : ''}`}
+                                                style={{ backgroundColor: isSelected ? undefined : color.hex }}
+                                            />
 
-                                            {/* Botão de Grid */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    toggleEdges(mesh.id)
-                                                }}
-                                                className={`
-                                                    p-1 rounded transition-colors
-                                                    ${isGridVisible
-                                                        ? 'text-cyan-400 hover:text-cyan-300 hover:bg-slate-700'
-                                                        : 'text-slate-600 hover:text-slate-400 hover:bg-slate-700'
-                                                    }
-                                                `}
-                                                title="Toggle Mesh Edges (Wireframe)"
-                                            >
-                                                <Grid size={14} />
-                                            </button>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-[10px] font-black truncate uppercase tracking-tight ${isSelected ? 'text-orange-400' : 'text-slate-200'}`}>
+                                                        {mesh.id.replace('_EXTRUSION', ' [3D]').replace('_extrusion.json', '').replace('.json', '').replace('_base', ' BASE').replace('_', ' ')}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {/* Botão de Visibilidade */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                toggleVisibility(mesh.id, e.altKey)
+                                                            }}
+                                                            className={`p-1 rounded transition-colors ${isHidden ? 'text-slate-600' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+                                                            title="Toggle Visibility"
+                                                        >
+                                                            {isHidden ? <EyeOff size={12} /> : <Eye size={12} />}
+                                                        </button>
+
+                                                        {/* Botão de Grid */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                toggleEdges(mesh.id)
+                                                            }}
+                                                            className={`p-1 rounded transition-colors ${isGridVisible ? 'text-cyan-400' : 'text-slate-600 hover:text-slate-400 hover:bg-white/10'}`}
+                                                            title="Wireframe Mode"
+                                                        >
+                                                            <Grid size={12} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[8px] font-mono text-slate-500 uppercase tracking-tighter">{color.name}</span>
+                                            </div>
                                         </div>
 
-                                        <div
-                                            className="w-2.5 h-2.5 rounded-full shadow-sm ring-1 ring-white/10 shrink-0 mx-1"
-                                            style={{
-                                                backgroundColor: isSelected ? '#F97316' : color.hex,
-                                                boxShadow: isSelected ? '0 0 8px #F97316' : 'none'
-                                            }}
-                                        />
-
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            <span className={`text-xs truncate ${isSelected ? 'text-orange-400 font-bold' : 'text-slate-200 font-medium'}`}>
-                                                {mesh.id.replace('_extrusion.json', '').replace('.json', '')}
+                                        {/* Opacity Slider - Apenas visível ou destacado se selecionado/hover */}
+                                        <div className="flex items-center gap-3 pl-4.5 pt-1">
+                                            <div className="w-full h-4 relative flex items-center">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="1"
+                                                    step="0.01"
+                                                    value={currentOpacity}
+                                                    onChange={(e) => {
+                                                        e.stopPropagation()
+                                                        setOpacityMap(prev => ({ ...prev, [mesh.id]: parseFloat(e.target.value) }))
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500 hover:accent-orange-400 outline-none"
+                                                />
+                                            </div>
+                                            <span className="text-[9px] font-mono text-slate-500 min-w-[30px] text-right">
+                                                {Math.round(currentOpacity * 100)}%
                                             </span>
                                         </div>
-
-                                        {isSelected && <MousePointer2 size={12} className="text-orange-500" />}
                                     </div>
                                 )
                             })
                         ) : (
-                            <div className="p-4 text-center text-slate-500 text-xs italic">
-                                Loading geometry...
+                            <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
+                                <Box className="w-12 h-12 text-slate-500" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.4em]">awaiting_geometry</span>
                             </div>
                         )}
+                    </div>
+
+                    {/* Rodapé do Painel */}
+                    <div className="px-4 py-2 bg-black/40 border-t border-white/5 flex items-center justify-between">
+                        <span className="text-[8px] font-mono text-slate-600 uppercase tracking-widest">Live_Rendering_Active</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    const next: any = {}
+                                    geometries.forEach(g => next[g.id] = 0.2)
+                                    setOpacityMap(next)
+                                }}
+                                className="text-[8px] font-bold text-cyan-500/50 hover:text-cyan-400 transition-colors uppercase"
+                            >
+                                Ghost_Mode
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

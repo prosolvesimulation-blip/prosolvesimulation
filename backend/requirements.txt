@@ -8,3 +8,4 @@ matplotlib
 meshio
 h5py
 vtk
+python-docx

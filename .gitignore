@@ -21,20 +21,43 @@ glob.1
 *.err.*
 *.out
 
-# MEDCOUPLING
+# MEDCOUPLING / SALOME
 MEDCOUPLING-9.15.0/
+SALOME-9.13.0/
 
 # Node / Frontend
 node_modules/
 dist/
 dist-ssr/
 *.local
+backend/static/assets/
+
+# Backups
+*- Copia.*
+*(Copia).*
+* - Copy.*
+* (Copy).*
+
+# Internal Docs & References
+prosolve/API_*.txt
+medloader_full_doc.txt
+post-processing-tab.md
+technical-report.md
+temp_verify_vtk/
+*.csv
+*.json
+!project.json
+!package.json
+!tsconfig.json
+!package-lock.json
 
 # IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+.gemini/
+brain/
 
 # OS
 Thumbs.db

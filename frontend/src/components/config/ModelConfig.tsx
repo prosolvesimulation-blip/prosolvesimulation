@@ -194,56 +194,73 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
         return groups.find(g => g.meshFile === file && g.name === name) || null
     }, [groups, selectedGroupId])
 
-    if (!projectPath) return <div className="p-10 text-center text-slate-500 font-mono tracking-tighter uppercase italic">waiting_for_payload: select_project</div>
+    if (!projectPath) return (
+        <div className="flex flex-col items-center justify-center h-full p-10 bg-[#0B0F19] text-slate-500 font-mono relative overflow-hidden">
+            <div className="absolute inset-0 opacity-[0.02] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+            <div className="z-10 bg-slate-900/50 p-8 rounded-full mb-6 border border-white/5 shadow-2xl">
+                <Search size={40} className="text-slate-700" />
+            </div>
+            <span className="text-xs font-black tracking-[0.4em] uppercase text-slate-600 mb-2">Workspace_Inactive</span>
+            <p className="text-[10px] opacity-50">Select a project to inspect geometry</p>
+        </div>
+    )
 
     if (groups.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-10 bg-slate-950 border border-dashed border-slate-800 rounded-none overflow-hidden relative">
+            <div className="flex flex-col items-center justify-center h-full p-10 bg-[#0B0F19] border border-dashed border-slate-800/50 relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
-                <div className="text-4xl mb-4 grayscale filter">🕸️</div>
-                <h3 className="text-sm font-black text-slate-500 uppercase tracking-[0.2em] mb-2">Null_Structure_Detected</h3>
-                <p className="mb-6 text-center max-w-xs text-[10px] text-slate-600 font-mono">Mesh topology sync failed or no groups found in the current workspace.</p>
+                <div className="relative z-10 text-center">
+                    <div className="inline-flex p-6 rounded-2xl bg-gradient-to-b from-slate-900 to-black border border-white/5 shadow-2xl mb-6">
+                        <Layers size={32} className="text-slate-700" />
+                    </div>
+                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Topology_Missing</h3>
+                    <p className="max-w-xs mx-auto text-[10px] text-slate-600 font-mono leading-relaxed">
+                        No mesh groups detected. Ensure your <span className="text-slate-500">.med</span> file contains named groups for classification.
+                    </p>
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="flex h-full w-full bg-slate-950 border border-slate-800 rounded-none overflow-hidden font-sans">
+        <div className="flex h-full w-full bg-[#0B0F19] font-sans overflow-hidden">
             {/* Master: Side List */}
-            <div className="w-[320px] shrink-0 border-r border-slate-800 flex flex-col bg-slate-900/10">
-                <div className="p-4 border-b border-slate-800 bg-slate-900/30">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <Layers className="w-4 h-4 text-cyan-500" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Mesh_Groups</span>
+            <div className="w-[340px] shrink-0 border-r border-white/5 flex flex-col bg-[#0F1218]">
+                <div className="p-5 border-b border-white/5">
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-cyan-500/10 rounded-md">
+                                <Layers className="w-4 h-4 text-cyan-400" />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Mesh_Groups</span>
                         </div>
-                        <div className="flex gap-1">
-                            <button onClick={() => toggleAll(true)} title="Check All" className="p-1 hover:bg-slate-800 text-slate-500 hover:text-cyan-400 transition-colors"><Check className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => toggleAll(false)} title="Uncheck All" className="p-1 hover:bg-slate-800 text-slate-500 hover:text-red-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                        <div className="flex gap-2">
+                            <button onClick={() => toggleAll(true)} title="Check All" className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-cyan-400 transition-colors"><Check className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => toggleAll(false)} title="Uncheck All" className="p-1.5 rounded-md hover:bg-white/5 text-slate-500 hover:text-rose-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                    <div className="space-y-3">
+                        <div className="relative group">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-cyan-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Filter identifier..."
+                                placeholder="Filter by identifier..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-none pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
+                                className="w-full bg-black/20 border border-white/5 rounded-lg pl-9 pr-4 py-2.5 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:border-cyan-500/30 transition-all font-mono"
                             />
                         </div>
-                        <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
+                        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                             {['all', '1D', '2D', '3D'].map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setFilterCategory(cat)}
                                     className={`
-                                        px-2 py-1 text-[9px] font-black uppercase border transition-all
+                                        px-3 py-1.5 text-[9px] font-black uppercase rounded-md border transition-all
                                         ${filterCategory === cat
-                                            ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400'
-                                            : 'bg-transparent border-slate-800 text-slate-600 hover:text-slate-400'}
+                                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                                            : 'bg-transparent border-white/5 text-slate-600 hover:text-slate-400 hover:bg-white/5'}
                                     `}
                                 >
                                     {cat}
@@ -253,7 +270,7 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1">
                     {filteredGroups.map((g) => {
                         const id = `${g.meshFile}:${g.name}`
                         const isActive = selectedGroupId === id
@@ -264,186 +281,178 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                                 key={id}
                                 onClick={() => setSelectedGroupId(id)}
                                 className={`
-                                    relative group p-3 mb-1 cursor-pointer border transition-all flex items-center gap-3
+                                    relative p-3 rounded-xl cursor-pointer border transition-all duration-200 flex items-center gap-3 group
                                     ${isActive
-                                        ? 'bg-cyan-500/5 border-cyan-500/30'
-                                        : 'bg-transparent border-transparent hover:bg-slate-800/40'}
-                                    ${!g.selected ? 'opacity-40 grayscale-[0.6]' : ''}
+                                        ? 'bg-cyan-500/5 border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.05)]'
+                                        : 'bg-transparent border-transparent hover:bg-white/5'}
+                                    ${!g.selected ? 'opacity-50 grayscale' : ''}
                                 `}
                             >
-                                <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${isActive ? 'bg-cyan-500' : 'bg-transparent'}`} />
                                 <input
                                     type="checkbox"
                                     checked={g.selected}
                                     onChange={(e) => { e.stopPropagation(); handleCheckboxChange(g.meshFile, g.name); }}
-                                    className="w-3 h-3 accent-cyan-500 bg-slate-900 border-slate-800 rounded-none shrink-0"
+                                    className="w-3.5 h-3.5 accent-cyan-500 bg-black/40 border-white/10 rounded cursor-pointer transition-transform hover:scale-110"
                                 />
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className={`text-xs font-black truncate pr-2 ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className={`text-[11px] font-black truncate pr-2 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-300'}`}>
                                             {g.name}
                                         </span>
-                                        <span className={`text-[8px] px-1 border font-bold ${colorClass}`}>
+                                        <span className={`text-[7px] px-1.5 py-0.5 rounded border bg-opacity-10 backdrop-blur-sm tracking-wide font-black ${colorClass.replace('bg-', 'bg-opacity-10 ')}`}>
                                             {g.category}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase">
-                                        <span className="truncate max-w-[120px]" title={g.meshFile}>{g.meshFile}</span>
-                                        <span>{g.count} el.</span>
+                                        <span className="truncate max-w-[100px] opacity-70" title={g.meshFile}>{g.meshFile}</span>
+                                        <span className="opacity-70 font-bold">{g.count} el.</span>
                                     </div>
                                 </div>
-                                <ChevronRight className={`w-4 h-4 transition-all ${isActive ? 'text-cyan-400' : 'text-slate-800 opacity-0 group-hover:opacity-100'}`} />
+                                {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-cyan-500 rounded-l-full shadow-[0_0_10px_rgba(6,182,212,0.5)]" />}
                             </div>
                         )
                     })}
                 </div>
 
-                <div className="p-2 border-t border-slate-800 bg-slate-900/30 text-[9px] font-mono text-slate-600 flex justify-between uppercase">
-                    <span>Total: {groups.length}</span>
-                    <span>Active: {groups.filter(x => x.selected).length}</span>
+                <div className="p-3 border-t border-white/5 bg-[#0A0C10] text-[9px] font-mono text-slate-600 flex justify-between uppercase tracking-wider">
+                    <span>Groups Detected: {groups.length}</span>
+                    <span className={groups.some(g => g.selected) ? 'text-cyan-600' : ''}>Active: {groups.filter(x => x.selected).length}</span>
                 </div>
             </div>
 
             {/* Detail: Inspector */}
-            <div className="flex-1 flex flex-col relative bg-slate-950">
+            <div className="flex-1 flex flex-col relative bg-[#0B0F19]">
                 <div className="absolute inset-0 pointer-events-none opacity-[0.02] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat" />
 
                 {selectedGroup ? (
                     <>
-                        <div className="h-20 shrink-0 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900/10">
+                        <div className="h-24 shrink-0 border-b border-white/5 flex items-center justify-between px-10 bg-gradient-to-r from-slate-900/50 to-transparent">
                             <div className="flex items-center gap-6">
-                                <div className={`p-4 border ${CATEGORY_COLORS[selectedGroup.category]}`}>
-                                    <Box className="w-5 h-5" />
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center border bg-opacity-5 ${CATEGORY_COLORS[selectedGroup.category]}`}>
+                                    <Box className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Entity_Group</span>
-                                        <div className={`w-1.5 h-1.5 rounded-full ${selectedGroup.selected ? 'bg-cyan-500 animate-pulse' : 'bg-slate-700'}`} />
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Selected_Entity</span>
+                                        {selectedGroup.selected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />}
                                     </div>
-                                    <h3 className="text-xl font-black text-white leading-none font-mono">
+                                    <h3 className="text-2xl font-black text-white leading-none tracking-tight">
                                         {selectedGroup.name}
                                     </h3>
                                 </div>
                             </div>
 
-                            <div className="flex gap-4 items-center">
+                            <div className="flex gap-8 items-center">
                                 <div className="text-right">
-                                    <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest">Source_File</span>
-                                    <span className="text-[10px] font-mono text-slate-400">{selectedGroup.meshFile}</span>
-                                </div>
-                                <div className="h-8 w-[1px] bg-slate-800 mx-2" />
-                                <div className={`px-3 py-1.5 border ${CATEGORY_COLORS[selectedGroup.category]} font-black text-[10px] uppercase`}>
-                                    Dim: {selectedGroup.category}
+                                    <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Source Filter</span>
+                                    <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-1 rounded">{selectedGroup.meshFile}</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
-                            <div className="max-w-3xl">
-                                <div className="grid grid-cols-2 gap-12 mb-12">
-                                    <div className="space-y-8">
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <Settings2 className="w-3.5 h-3.5 text-cyan-500" />
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model_Specification</h4>
+                            <div className="max-w-4xl">
+                                <div className="grid grid-cols-5 gap-8 mb-12">
+                                    {/* Left Column: Configuration */}
+                                    <div className="col-span-3 space-y-8">
+                                        <section className="bg-slate-900/30 border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-cyan-500/20 transition-colors">
+                                            <div className="absolute top-0 right-0 p-20 bg-cyan-500/5 blur-[60px] rounded-full group-hover:bg-cyan-500/10 transition-all" />
+
+                                            <div className="flex items-center gap-3 mb-6 relative z-10">
+                                                <div className="p-2 bg-slate-950 rounded-lg border border-white/10">
+                                                    <Settings2 className="w-4 h-4 text-cyan-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Physics Formulation</h4>
+                                                    <p className="text-[9px] text-slate-500">Mathematical Strategy</p>
+                                                </div>
                                             </div>
-                                            <div className="bg-slate-900/40 border border-slate-800 p-1">
+
+                                            <div className="relative z-10">
                                                 <select
                                                     value={selectedGroup.model}
                                                     onChange={(e) => handleModelChange(selectedGroup.meshFile, selectedGroup.name, e.target.value)}
                                                     disabled={!selectedGroup.selected}
                                                     className={`
-                                                        w-full bg-slate-950 text-xs font-bold text-white p-3 focus:outline-none transition-all
-                                                        ${!selectedGroup.selected ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-900 border-l-2 border-l-cyan-500'}
+                                                        w-full bg-[#0B0F19] text-sm font-bold text-white p-4 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500/50 appearance-none transition-all
+                                                        ${!selectedGroup.selected ? 'opacity-40 cursor-not-allowed' : 'hover:border-white/20'}
                                                     `}
                                                 >
                                                     {selectedGroup.category === '3D' && (
-                                                        <optgroup label="Solid (Volume) Formulation">
-                                                            {MODEL_OPTIONS['3D'].map(op => (
-                                                                <option key={op.value} value={op.value}>{op.label}</option>
-                                                            ))}
+                                                        <optgroup label="Solid Definition">
+                                                            {MODEL_OPTIONS['3D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                                                         </optgroup>
                                                     )}
                                                     {selectedGroup.category === '2D' && (
-                                                        <optgroup label="Plate/Shell Formulation">
-                                                            {MODEL_OPTIONS['2D'].map(op => (
-                                                                <option key={op.value} value={op.value}>{op.label}</option>
-                                                            ))}
+                                                        <optgroup label="Shell Definition">
+                                                            {MODEL_OPTIONS['2D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                                                         </optgroup>
                                                     )}
                                                     {selectedGroup.category === '1D' && (
-                                                        <optgroup label="Beam/Truss Formulation">
-                                                            {MODEL_OPTIONS['1D'].map(op => (
-                                                                <option key={op.value} value={op.value}>{op.label}</option>
-                                                            ))}
+                                                        <optgroup label="Beam Definition">
+                                                            {MODEL_OPTIONS['1D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                                                         </optgroup>
                                                     )}
                                                 </select>
-                                            </div>
-                                            <p className="mt-4 text-[10px] text-slate-600 italic font-mono leading-relaxed">
-                                                The mathematical formulation determines how the integration points and degrees of freedom are evaluated during simulation.
-                                            </p>
-                                        </section>
+                                                <div className="absolute right-4 top-[84px] pointer-events-none text-slate-500">
+                                                    <ChevronRight size={14} className="rotate-90" />
+                                                </div>
 
-                                        <section className="bg-slate-900/20 border-l border-l-slate-800 p-4">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Activity className="w-3 h-3 text-slate-500" />
-                                                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Physics_Engine</h4>
+                                                <div className="flex items-start gap-3 mt-4 p-3 rounded-lg bg-cyan-900/10 border border-cyan-500/10">
+                                                    <Activity className="w-4 h-4 text-cyan-500 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-cyan-200">Mechanical Solver Active</p>
+                                                        <p className="text-[9px] text-cyan-500/70 mt-0.5">Linear Elasticity applied to {selectedGroup.count} elements.</p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="text-xs font-bold text-slate-300">PHENOMENE = 'MECANIQUE'</div>
-                                            <div className="text-[9px] text-slate-600 mt-1 uppercase font-mono">Standard linear elastic solver</div>
                                         </section>
                                     </div>
 
-                                    <div className="space-y-8">
-                                        <section>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <Database className="w-3.5 h-3.5 text-slate-500" />
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Internal_Topology</h4>
+                                    {/* Right Column: Statistics */}
+                                    <div className="col-span-2 space-y-4">
+                                        <div className="p-6 bg-slate-900/30 border border-white/5 rounded-2xl">
+                                            <div className="flex items-center gap-2 mb-4 opacity-50">
+                                                <Database className="w-3.5 h-3.5" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Mesh Metrics</span>
                                             </div>
-                                            <div className="p-4 border border-slate-800 bg-slate-900/10">
-                                                <div className="flex justify-between items-end mb-4">
-                                                    <div>
-                                                        <span className="block text-[8px] font-bold text-slate-600 uppercase">Elem_Count</span>
-                                                        <span className="text-2xl font-black text-white font-mono leading-none">{selectedGroup.count}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <span className="block text-[8px] font-bold text-slate-600 uppercase">Integration_Degree</span>
-                                                        <span className="text-xs font-bold text-cyan-400 uppercase">Linear / P1</span>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <span className="block text-[8px] font-bold text-slate-600 uppercase mb-2">Structure_Composition</span>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {selectedGroup.composition.split(',').map(part => (
-                                                            <span key={part} className="px-1.5 py-0.5 bg-slate-800 text-slate-400 font-mono text-[9px] border border-slate-700">{part.trim()}</span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </section>
 
-                                        <div className="bg-orange-500/5 border border-orange-500/20 p-4">
-                                            <div className="flex items-start gap-3">
-                                                <AlertCircle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                                            <div className="space-y-4">
                                                 <div>
-                                                    <h5 className="text-[10px] font-black text-orange-400 uppercase mb-1 leading-none tracking-widest">Automated_Check</h5>
-                                                    <p className="text-[9px] text-orange-500/80 leading-relaxed italic">
-                                                        Ensuring connectivity matches the {selectedGroup.category} logic.
-                                                        Warning: Inconsistent dimension formulations will cause job termination.
-                                                    </p>
+                                                    <span className="text-3xl font-light text-white">{selectedGroup.count}</span>
+                                                    <span className="block text-[9px] text-slate-500 font-mono uppercase mt-1">Total Elements</span>
+                                                </div>
+                                                <div className="h-px bg-white/5" />
+                                                <div className="flex flex-wrap gap-2">
+                                                    {selectedGroup.composition.split(',').map(part => (
+                                                        <span key={part} className="px-2 py-1 bg-black/40 border border-white/5 rounded text-[9px] font-mono text-slate-400">{part.trim()}</span>
+                                                    ))}
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {selectedGroup.category !== '3D' && (
+                                            <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl flex gap-3">
+                                                <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                                                <div>
+                                                    <h5 className="text-[10px] font-bold text-amber-200 uppercase mb-1">Thickness Required</h5>
+                                                    <p className="text-[9px] text-amber-500/70 leading-relaxed">
+                                                        GeometryConfig tab config required for sections/thickness.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center opacity-20 filter grayscale">
-                        <Search className="w-12 h-12 text-slate-500 mb-4" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">awaiting_selection</span>
+                    <div className="flex-1 flex flex-col items-center justify-center opacity-30">
+                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                            <Search className="w-8 h-8 text-slate-500" />
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Awaiting Selection</span>
                     </div>
                 )}
             </div>

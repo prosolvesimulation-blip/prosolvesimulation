@@ -7,11 +7,19 @@ import webview
 from jinja2 import Environment, FileSystemLoader
 import threading
 
-from services.vtk_converter import call_med_extractor
-
-api_blueprint = Blueprint('api', __name__)
+# from services.vtk_converter import call_med_extractor  # DELETED
+# from services.med.vtk_extruder import extrude_beam_memory, extrude_shell_memory  # Imported inside routes now
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# For med_mesher call
+ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
+MED_ENV_DIR = os.path.join(ROOT_DIR, "MEDCOUPLING-9.15.0", "MEDCOUPLING-9.15.0")
+MESHER_SCRIPT = os.path.join(ROOT_DIR, "backend", "services", "med", "med_mesher.py")
+RESULTS_SCRIPT = os.path.join(ROOT_DIR, "backend", "services", "med", "med_results_service.py")
+ANALYSIS_SCRIPT = os.path.join(ROOT_DIR, "backend", "services", "med", "med_analysis_service.py")
+
+api_blueprint = Blueprint('api', __name__)
 
 @api_blueprint.route('/health', methods=['GET'])
 def health():
@@ -305,7 +313,10 @@ def init_aster_files(folder_path, mesh_files):
 def read_mesh_groups():
     """Reads mesh groups directly from MED files using MEDCOUPLING extractor."""
     try:
-        from services.vtk_converter import call_med_extractor
+        # from services.vtk_converter import call_med_extractor # DELETED
+        from services.med.med_extractor import extract_med_data as call_med_extractor # Use direct if safe or env wrapper
+        # Actually, let's use the env wrapper to be safe since it's an API call
+        from api.routes import call_med_extractor_env as call_med_extractor_safe
         
         data = request.get_json()
         folder_path = data.get('folder_path')
@@ -326,7 +337,7 @@ def read_mesh_groups():
             print(f"[API] Extracting groups from: {mesh_file}")
             
             # Use our professional extractor
-            result = call_med_extractor(target_path)
+            result = call_med_extractor_safe(target_path)
             
             if result and result.get("status") == "success":
                 # Merge into a format matches mesh_groups.json structure
@@ -694,7 +705,7 @@ def get_mesh_data():
 def get_mesh_vtk():
     """Reads ALL mesh files in VTK format for visualization."""
     try:
-        from services.vtk_converter import med_to_vtk_json
+        from services.med.vtk_extruder import med_to_vtk_pipeline as med_to_vtk_json
         
         data = request.get_json()
         folder_path = data.get('folder_path')
@@ -763,6 +774,76 @@ def get_mesh_vtk():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+
+
+
+@api_blueprint.route('/3d/generate', methods=['POST'])
+def generate_3d_view():
+    """
+    RESTORED: In-Memory 3D Generation Endpoint.
+    1. Receives geometry state (params for extrusion).
+    2. Reads MED files.
+    3. Applies native VTK extrusion (Beam/Shell) in memory.
+    4. Returns a list of separate components for the viewer.
+    """
+    try:
+        from services.med.vtk_extruder import med_to_vtk_pipeline as med_to_vtk_json
+        
+        data = request.get_json()
+        project_path = data.get('project_path')
+        geometry_state = data.get('geometry_state', [])
+        
+        print(f"[3D-VIEW] START: project_path={project_path}")
+        print(f"[3D-VIEW] RECEIVED {len(geometry_state)} geometry configs.")
+        if len(geometry_state) > 0:
+            print(f"[3D-VIEW] Sample Config 0: group={geometry_state[0].get('group')}, category={geometry_state[0].get('_category')}, has_section_mesh={bool(geometry_state[0].get('section_mesh'))}")
+
+        
+        if not project_path or not os.path.exists(project_path):
+            return jsonify({"status": "error", "message": "Invalid Project Path"}), 400
+
+        # Find MED files
+        med_files = [f for f in os.listdir(project_path) if f.lower().endswith('.med') and 'resu' not in f.lower()]
+        
+        if not med_files:
+            return jsonify({"status": "warning", "message": "No mesh files found", "data": []})
+
+        scene_components = []
+
+        for med_file in med_files:
+            full_path = os.path.join(project_path, med_file)
+            print(f"[3D-GEN] Processing {med_file} with {len(geometry_state)} geometry configs...")
+            
+            # This returns a merged structure: { points: [...], cells: { "GroupA": {conn...}, "GroupB": ... } }
+            vtk_result = med_to_vtk_json(full_path, geometries=geometry_state)
+            
+            if vtk_result.get("status") != "success":
+                print(f"[3D-GEN] Failed to process {med_file}: {vtk_result.get('message')}")
+                continue
+                
+            # Flatten groups into separate scene components for the inventory
+            for group_name, group_data in vtk_result["cells"].items():
+                component = {
+                    "id": f"{med_file}_{group_name}",
+                    "data": {
+                        "points": vtk_result["points"],
+                        "connectivity": group_data["connectivity"],
+                        "vtk_type": group_data.get("vtk_type", 5),
+                        "is_extruded": group_data.get("is_extruded", False),
+                        "is_base": group_data.get("is_base", False)
+                    }
+                }
+                scene_components.append(component)
+
+        return jsonify({
+            "status": "success",
+            "data": scene_components
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e), "traceback": traceback.format_exc()}), 500
 
 
 @api_blueprint.route('/get_hq_assembly', methods=['POST'])
@@ -847,9 +928,12 @@ def get_hq_assembly():
 
 
 
+REPORT_SCRIPT = os.path.join(ROOT_DIR, "backend", "services", "med", "med_analysis_report.py")
+PROCESSOR_SCRIPT = os.path.join(ROOT_DIR, "backend", "services", "med", "vtk_analysis_processor.py")
+
 @api_blueprint.route('/mesh_dna', methods=['POST'])
 def api_mesh_dna():
-    """Proxy for legacy mesh_dna call, using modern extractor service."""
+    """Proxy for legacy mesh_dna call, handles routing to dedicated analysis reporter."""
     try:
         data = request.get_json()
         file_path = data.get('file_path')
@@ -857,97 +941,267 @@ def api_mesh_dna():
         if not file_path or not os.path.exists(file_path):
             return jsonify({"status": "error", "message": "Invalid file path"}), 400
 
-        print(f"[API] Requesting DNA for: {os.path.basename(file_path)}")
-        
-        # Use our professional service
-        result = call_med_extractor(file_path)
-        
-        if result:
-            return jsonify(result)
-        else:
-            return jsonify({"status": "error", "message": "Failed to extract mesh DNA"}), 500
-
-    except Exception as e:
-        print(f"[API] Mesh DNA Error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-
-
-
-# No topo do routes.py
-from services.med.call_med_mesher import run_batch_med_processing
-
-@api_blueprint.route('/vtk', methods=['POST'])
-def generate_vtk():
-    data = request.json
-    project_path = data.get('project_path')
-
-    if not project_path or not os.path.exists(project_path):
-        return jsonify({"status": "error", "message": "Caminho inválido"}), 400
-
-    try:
-        # --- MUDANÇA AQUI: TIRA A THREAD ---
-        # Chamamos a função diretamente. O servidor vai ficar "travado" 
-        # aqui até o script terminar. Isso garante que quando retornar,
-        # os arquivos JSON já existem no disco.
-        run_batch_med_processing(project_path)
-
-        return jsonify({
-            "status": "success", 
-            "message": "Processamento concluído com sucesso."
-        })
-
-    except Exception as e:
-        print(f"Erro no processamento VTK: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-
-
-
-@api_blueprint.route('/get_vtk_geometry', methods=['POST'])
-def get_vtk_geometry():
-    """
-    Lê TODOS os arquivos .json da pasta.
-    SEM FILTROS. SEM VALIDAÇÃO DE CONTEÚDO.
-    """
-    data = request.get_json()
-    folder_path = data.get('folder_path') or data.get('project_path')
-
-    if not folder_path or not os.path.exists(folder_path):
-        return jsonify({"status": "error", "message": "Caminho inválido"}), 400
-
-    json_files = []
-    
-    try:
-        # Pega tudo que termina com .json
-        files = [f for f in os.listdir(folder_path) if f.lower().endswith('.json')]
-
-        for filename in files:
-            file_path = os.path.join(folder_path, filename)
+        # ANALYSIS ROUTING: Use dedicated REPORT for results
+        if "resu" in os.path.basename(file_path).lower():
+            print(f"[API] Routing {os.path.basename(file_path)} to REPORT SERVICE")
+            output = run_extraction_command(file_path, "--mesh")
             
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = json.load(f)
-
-                # Adiciona à lista independente do que tem dentro
-                json_files.append({
-                    "id": filename,
-                    "data": content
+            # For DNA, we just need the report format or wrap it to match legacy
+            if output.get("status") == "success":
+                # Match legacy structure for window.projectState
+                return jsonify({
+                    "status": "success",
+                    "points": output["data"]["points"],
+                    "cells": {
+                        "_FULL_MESH_": {
+                            "connectivity": output["data"]["connectivity"],
+                            "num_elements": output["data"]["num_elements"],
+                            "type": "poly"
+                        }
+                    }
                 })
-                    
-            except Exception as read_err:
-                # Se o arquivo estiver corrompido e não for um JSON válido, avisa no log mas não trava
-                print(f"[API] Falha ao ler JSON {filename}: {read_err}")
-                continue
-
-        print(f"[API] Entregando {len(json_files)} arquivos JSON.")
+            return jsonify(output)
         
-        return jsonify({
-            "status": "success", 
-            "data": json_files
-        })
+        # Standard workflow for input meshes - MUST RUN IN SALOME ENVIRONMENT
+        return jsonify(call_med_extractor_env(file_path))
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+def call_med_extractor_env(file_path):
+    """Executes med_extractor.py in the SALOME environment for library access."""
+    extractor_script = os.path.join(ROOT_DIR, "backend", "services", "med", "med_extractor.py")
+    try:
+        cmd = (
+            f'cmd /c "cd /d \"{MED_ENV_DIR}\" && '
+            f'call env_launch.bat && '
+            f'python \"{extractor_script}\" \"{file_path}\""'
+        )
+        print(f"[API] Executing med_extractor in env...")
+        result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+        
+        if result.returncode == 0:
+            output = result.stdout
+            if "__JSON_START__" in output and "__JSON_END__" in output:
+                json_str = output.split("__JSON_START__")[1].split("__JSON_END__")[0]
+                return json.loads(json_str)
+            return {"status": "error", "message": f"Malformed output: {output}"}
+        return {"status": "error", "message": f"Process failed: {result.stderr}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@api_blueprint.route('/report/generate', methods=['POST'])
+def generate_report():
+    """Aggregates project data and generates a DOCX report."""
+    try:
+        from services.report.report_service import create_report_file
+        
+        data = request.get_json()
+        project_path = data.get('project_path')
+        images = data.get('images', []) 
+        selection = data.get('selection')
+        
+        if not project_path or not os.path.exists(project_path):
+            return jsonify({"status": "error", "message": "Invalid Project Path"}), 400
+            
+        # 1. Load Project Configuration
+        project_config = {}
+        project_file = os.path.join(project_path, "project.json")
+        if os.path.exists(project_file):
+            try:
+                with open(project_file, 'r', encoding='utf-8') as f:
+                    project_config = json.load(f)
+            except Exception as e:
+                print(f"[Report] Failed to load project.json: {e}")
+
+        # 2. Gather Simulation Data
+        context = {
+            "project_name": os.path.basename(project_path),
+            "project_config": project_config,
+            "images": images,
+            "mass_props": {},
+            "reactions": [],
+            "max_stress": 0.0
+        }
+        
+        sim_dir = os.path.join(project_path, "simulation_files")
+        mass_file = os.path.join(sim_dir, "mass_properties.csv")
+        reac_file = os.path.join(sim_dir, "reactions.csv")
+        
+        # Parse Mass
+        if os.path.exists(mass_file):
+            try:
+                with open(mass_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    header_idx = -1
+                    for i, line in enumerate(lines):
+                        if line.strip().startswith("LIEU"):
+                            header_idx = i
+                            break
+                    if header_idx != -1 and header_idx + 1 < len(lines):
+                        parts = [p.strip() for p in lines[header_idx+1].split(',') if p.strip()]
+                        if len(parts) >= 6:
+                            context["mass_props"] = {
+                                "mass": float(parts[2]),
+                                "cdg_x": float(parts[3]),
+                                "cdg_y": float(parts[4]),
+                                "cdg_z": float(parts[5])
+                            }
+            except: pass
+
+        # Parse Reactions
+        if os.path.exists(reac_file):
+            try:
+                with open(reac_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    for line in lines:
+                        parts = [p.strip() for p in line.split(',') if p.strip()]
+                        if len(parts) >= 6 and parts[0].replace('.','').replace('-','').isdigit(): 
+                            context["reactions"].append({
+                                "fx": float(parts[-6]),
+                                "fy": float(parts[-5]),
+                                "fz": float(parts[-4]),
+                                "mx": float(parts[-3]),
+                                "my": float(parts[-2]),
+                                "mz": float(parts[-1]),
+                                "case_name": "Load Case"
+                            })
+            except: pass
+
+        # Parse Max Stress (Field VMIS)
+        try:
+            resu_path = os.path.join(sim_dir, "resu.med")
+            if os.path.exists(resu_path):
+                meta_res = run_extraction_command(resu_path, "--meta")
+                if meta_res["status"] == "success":
+                    fields = meta_res["fields"].keys()
+                    vm_field = next((f for f in fields if "VM" in f or "SIGM" in f), None)
+                    if vm_field:
+                        data_res = run_extraction_command(resu_path, vm_field)
+                        if data_res["status"] == "success":
+                            vals = data_res["data"]["values"]
+                            if vals:
+                                context["max_stress"] = max(vals)
+        except Exception as e:
+            print(f"[Report] Stress extraction failed: {e}")
+
+        # 3. Generate DOCX
+        result = create_report_file(project_path, context, selection=selection)
+        return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_blueprint.route('/report/open', methods=['POST'])
+def open_report():
+    """Opens the generated DOCX report using the system's default handler (Windows)."""
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        
+        if not file_path or not os.path.exists(file_path):
+            return jsonify({"status": "error", "message": "File not found"}), 404
+            
+        print(f"[API] Opening report: {file_path}")
+        os.startfile(file_path)
+        
+        return jsonify({"status": "success", "message": "Report opened successfully"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_blueprint.route('/post/results', methods=['POST'])
+def get_simulation_results():
+    """Lists fields from resu.med via REPORT SERVICE."""
+    try:
+        data = request.get_json()
+        project_path = data.get('project_path')
+        resu_path = os.path.join(project_path, "simulation_files", "resu.med")
+        if not os.path.exists(resu_path):
+            return jsonify({"status": "error", "message": "Result file not found"}), 404
+            
+        output = run_extraction_command(resu_path, "--meta")
+        return jsonify(output)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api_blueprint.route('/post/field', methods=['POST'])
+def get_result_field():
+    """
+    ULTIMATE PIPELINE: 
+    1. Extract raw data via REPORT SERVICE
+    2. Process via VTK PROCESSOR (Native Active Scalars)
+    3. Return Unified Scene to Screen
+    """
+    try:
+        data = request.get_json()
+        project_path = data.get('project_path')
+        mode = data.get('mode') 
+        
+        resu_path = os.path.join(project_path, "simulation_files", "resu.med")
+        
+        # STAGE 1: THE REPORT
+        mesh_rpt = run_extraction_command(resu_path, "--mesh")
+        field_rpt = run_extraction_command(resu_path, mode)
+        
+        if mesh_rpt.get("status") != "success" or field_rpt.get("status") != "success":
+            return jsonify({"status": "error", "message": "Extraction Stage Failed"})
+
+        # STAGE 2: THE PROCESSOR (Dual Process Bridge)
+        bundle = {"mesh_report": mesh_rpt, "field_report": field_rpt}
+        scene = run_processor_command(bundle, mode)
+        
+        return jsonify(scene)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def run_result_command(file_path, mode, step=0):
+    """Old bridge (keeping for compatibility if other modules use it)."""
+    return run_extraction_command(file_path, mode)
+
+def run_extraction_command(file_path, cmd):
+    """Bridge to the high-fidelity Report service."""
+    command = (
+        f'cmd /c "cd /d "{MED_ENV_DIR}" && '
+        f'call env_launch.bat && '
+        f'cd /d "{ROOT_DIR}" && '
+        f'python "{REPORT_SCRIPT}" "{cmd}" "{file_path}""'
+    )
+    return _execute_pipe_command(command)
+
+def run_processor_command(data_bundle, field_name):
+    """Bridge to the VTK-Native processor."""
+    # Data is passed asescaped JSON string
+    json_data = json.dumps(data_bundle).replace('"', '\"')
+    command = (
+        f'cmd /c "cd /d "{MED_ENV_DIR}" && '
+        f'call env_launch.bat && '
+        f'cd /d "{ROOT_DIR}" && '
+        f'python "{PROCESSOR_SCRIPT}" "{json_data}" "{field_name}""'
+    )
+    # We use a custom execution for processor because of large JSON input
+    proc = subprocess.run(command, shell=True, capture_output=True, text=True)
+    if proc.returncode == 0:
+        raw_out = proc.stdout
+        marker = "__JSON_START__"
+        if marker in raw_out:
+            json_str = raw_out.split(marker)[1].split("__JSON_END__")[0]
+            return json.loads(json_str)
+    return {"status": "error", "message": "Processor failed", "stderr": proc.stderr}
+
+def _execute_pipe_command(command):
+    """General pipe bridge."""
+    proc = subprocess.run(command, shell=True, capture_output=True, text=True)
+    if proc.returncode == 0:
+        raw_out = proc.stdout
+        start_marker = "__JSON_START__"
+        end_marker = "__JSON_END__"
+        if start_marker in raw_out and end_marker in raw_out:
+            json_str = raw_out.split(start_marker)[1].split(end_marker)[0]
+            return json.loads(json_str)
+    return {"status": "error", "message": f"Pipe failure: {proc.stderr}"}
