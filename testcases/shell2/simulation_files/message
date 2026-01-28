@@ -14,7 +14,7 @@ Ouverture en écriture du fichier ./vola.1
                            révision 5029d61da970 - branche 'windows-v16'                            
                                    Copyright EDF R&D 1991 - 2026                                    
                                                                                                     
-                              Exécution du : Mon Jan 26 22:00:58 2026                               
+                              Exécution du : Tue Jan 27 12:29:23 2026                               
                                         Nom de la machine :                                         
                                                 Home                                                
                                         Architecture : 64bit                                        
@@ -83,15 +83,15 @@ d'accès en écriture        :  0
 
 Relecture des catalogues des éléments faite.
 
-Fin de lecture (durée  1.000000  s.) 
+Fin de lecture (durée  0.000000  s.) 
 
                       Mémoire limite pour l'allocation dynamique : 2355.20 Mo                       
                               ajouté à l'initialisation du processus :                              
-                                             271.61 Mo                                              
-                               Limite cible du processus : 2626.81 Mo                               
+                                             271.54 Mo                                              
+                               Limite cible du processus : 2626.74 Mo                               
                          Taille limite des fichiers d'échange : 2048.00 Go                          
-# Mémoire (Mo) :   271.61 /   264.17 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0001   user+syst:        0.09s (syst:        0.16s, elaps:        0.00s)
+# Mémoire (Mo) :   271.54 /   264.10 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
+# Fin commande #0001   user+syst:        0.02s (syst:        0.23s, elaps:        0.00s)
 # ----------------------------------------------------------------------------------------------
 
 .. _stg1_txt12
@@ -102,7 +102,7 @@ DEFI_FICHIER(ACCES='NEW',
              TYPE='BINARY',
              UNITE=8)
 
-# Mémoire (Mo) :   271.61 /   264.30 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
+# Mémoire (Mo) :   271.54 /   264.24 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
 # Fin commande #0002   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
 # ----------------------------------------------------------------------------------------------
 
@@ -139,16 +139,19 @@ NOMBRE DE GROUPES DE MAILLES               3
 Vérification du maillage.
 
 # Résultat commande #0003 (LIRE_MAILLAGE): shell ('<00000001>') de type <Mesh>
-# Mémoire (Mo) :   283.12 /   283.12 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0003   user+syst:        0.03s (syst:        0.05s, elaps:        0.00s)
+# Mémoire (Mo) :   282.70 /   282.70 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
+# Fin commande #0003   user+syst:        0.06s (syst:        0.05s, elaps:        0.00s)
 # ----------------------------------------------------------------------------------------------
 
 .. _stg1_txt29
 # ----------------------------------------------------------------------------------------------
 # Commande #0004 de fort.1, ligne 29
-MODELE = AFFE_MODELE(AFFE=_F(GROUP_MA='12mm',
-                             MODELISATION='DKT',
-                             PHENOMENE='MECANIQUE'),
+MODELE = AFFE_MODELE(AFFE=(_F(GROUP_MA='12mm',
+                              MODELISATION='3D',
+                              PHENOMENE='MECANIQUE'),
+                           _F(GROUP_MA='_FULL_MESH_',
+                              MODELISATION='3D',
+                              PHENOMENE='MECANIQUE')),
                      DISTRIBUTION=_F(METHODE='SOUS_DOMAINE',
                                      PARTITIONNEUR='METIS'),
                      INFO=1,
@@ -156,515 +159,33 @@ MODELE = AFFE_MODELE(AFFE=_F(GROUP_MA='12mm',
                      VERI_JACOBIEN='OUI',
                      VERI_NORM_IFS='OUI')
 
-Sur les 1400 mailles du maillage 00000001, on a demandé l'affectation de 1250, on a pu en affecter
-1250.
-Modélisation     Formulation      Type maille  Élément fini     Nombre
-DKT              _                QUAD4        MEDKQU4          1250
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
+
+ ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+ ║ <EXCEPTION> <MODELISA7_77>                                                                     ║
+ ║                                                                                                ║
+ ║ le GROUP_MA  _FULL_MESH_  ne fait pas partie du maillage :  00000001                           ║
+ ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+   !-----------------------------------------------------------------!
+   !                                                                 !
+   !    FATAL ERROR detected in Code_Aster for Windows               !
+   !                                                                 !
+   !    Subscribe to the premium version if you need bug fixes       !
+   !                                                                 !
+   !                      support@simulease.com                      !
+   !                                                                 !
+   !-----------------------------------------------------------------!
+Destruction du concept '00000002' suite à l'erreur précédente.
+
 # Résultat commande #0004 (AFFE_MODELE): MODELE ('<00000002>') de type <Model>
-# Mémoire (Mo) :   284.57 /   284.57 /   208.39 /   197.03 (VmPeak / VmSize / Optimum / Minimum)
+# Mémoire (Mo) :   283.18 /   283.18 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
 # Fin commande #0004   user+syst:        0.02s (syst:        0.00s, elaps:        0.00s)
 # ----------------------------------------------------------------------------------------------
 
-.. _stg1_txt38
-# ----------------------------------------------------------------------------------------------
-# Commande #0005 de fort.1, ligne 38
-M_STEEL_S355 = DEFI_MATERIAU(ELAS=_F(B_ENDOGE=0.0,
-                                     COEF_AMOR=1.0,
-                                     E=210000000000,
-                                     K_DESSIC=0.0,
-                                     NU=0.3,
-                                     RHO=7850),
-                             INFO=1)
-
-# Résultat commande #0005 (DEFI_MATERIAU): M_STEEL_S355 ('<00000003>') de type <Material>
-# Mémoire (Mo) :   284.65 /   284.65 /   208.39 /   197.03 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0005   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt46
-# ----------------------------------------------------------------------------------------------
-# Commande #0006 de fort.1, ligne 46
-CHAM_MATER = AFFE_MATERIAU(AFFE=_F(MATER=M_STEEL_S355,
-                                   TOUT='OUI'),
-                           INFO=1,
-                           MODELE=MODELE)
-
-# Résultat commande #0006 (AFFE_MATERIAU): CHAM_MATER ('<00000004>') de type <MaterialField>
-# Mémoire (Mo) :   284.83 /   284.83 /   208.39 /   197.03 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0006   user+syst:        0.02s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt59
-# ----------------------------------------------------------------------------------------------
-# Commande #0007 de fort.1, ligne 59
-CARA_ELEM = AFFE_CARA_ELEM(COQUE=_F(A_CIS=0.8333333,
-                                    COEF_RIGI_DRZ=1e-05,
-                                    COQUE_NCOU=1,
-                                    EPAIS=20,
-                                    EXCENTREMENT=10,
-                                    GROUP_MA='12mm',
-                                    INER_ROTA='OUI',
-                                    MODI_METRIQUE='NON',
-                                    VECTEUR=(1, 0, 0)),
-                           INFO=1,
-                           MODELE=MODELE)
+Exception: Trying to close the database after an uncaught exception...
 
 
-     LE MODELE 00000002 CONTIENT : 
-                                     1250 ELEMENT(S) COQUE           
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
-# Résultat commande #0007 (AFFE_CARA_ELEM): CARA_ELEM ('<00000005>') de type
-<ElementaryCharacteristics>
-# Dépend de :
-# - MODELE ('<00000002>') de type <Model>
-# Mémoire (Mo) :   285.44 /   285.44 /   208.39 /   197.17 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0007   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt71
-# ----------------------------------------------------------------------------------------------
-# Commande #0008 de fort.1, ligne 71
-BC_RULE_1 = AFFE_CHAR_MECA(DDL_IMPO=_F(DRX=0,
-                                       DRY=0,
-                                       DRZ=0,
-                                       DX=0,
-                                       DY=0,
-                                       DZ=0,
-                                       GROUP_NO='fixed_node'),
-                           DOUBLE_LAGRANGE='OUI',
-                           INFO=1,
-                           MODELE=MODELE,
-                           VERI_AFFE='OUI',
-                           VERI_NORM='OUI')
-
-# Résultat commande #0008 (AFFE_CHAR_MECA): BC_RULE_1 ('<00000006>') de type <MechanicalLoadReal>
-# Mémoire (Mo) :   286.03 /   286.03 /   208.39 /   197.17 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0008   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt84
-# ----------------------------------------------------------------------------------------------
-# Commande #0009 de fort.1, ligne 84
-ACCEL_1 = AFFE_CHAR_MECA(DOUBLE_LAGRANGE='OUI',
-                         INFO=1,
-                         MODELE=MODELE,
-                         PESANTEUR=_F(DIRECTION=(0, 0, -1),
-                                      GRAVITE=9.81),
-                         VERI_AFFE='OUI',
-                         VERI_NORM='OUI')
-
-# Résultat commande #0009 (AFFE_CHAR_MECA): ACCEL_1 ('<00000007>') de type <MechanicalLoadReal>
-# Mémoire (Mo) :   286.04 /   286.04 /   208.39 /   197.17 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0009   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt96
-# ----------------------------------------------------------------------------------------------
-# Commande #0010 de fort.1, ligne 96
-RESU_LOAD_COMB_01 = MECA_STATIQUE(CARA_ELEM=CARA_ELEM,
-                                  CHAM_MATER=CHAM_MATER,
-                                  EXCIT=(_F(CHARGE=ACCEL_1,
-                                            TYPE_CHARGE='FIXE_CSTE'),
-                                         _F(CHARGE=BC_RULE_1,
-                                            TYPE_CHARGE='FIXE_CSTE')),
-                                  INFO=1,
-                                  INST=0.0,
-                                  MODELE=MODELE,
-                                  OPTION='SIEF_ELGA',
-                                  SOLVEUR=_F(ACCELERATION='AUTO',
-                                             ELIM_LAGR='LAGR2',
-                                             GESTION_MEMOIRE='AUTO',
-                                             LOW_RANK_SEUIL=0.0,
-                                             MATR_DISTRIBUEE='NON',
-                                             METHODE='MUMPS',
-                                             NB_RHS=1,
-                                             NPREC=8,
-                                             PCENT_PIVOT=35,
-                                             POSTTRAITEMENTS='AUTO',
-                                             PRETRAITEMENTS='AUTO',
-                                             REDUCTION_MPI=0,
-                                             RENUM='AUTO',
-                                             RESI_RELA=1e-06,
-                                             STOP_SINGULIER='OUI',
-                                             TYPE_RESOL='AUTO'))
-
-Le système linéaire à résoudre a 8268 degrés de liberté:
-   - 7956 sont des degrés de liberté
-physiques
-     (ils sont portés par 1326 noeuds du maillage)
-   - 312 sont les couples de paramètres
-de Lagrange associés
-     aux 156 relations linéaires dualisées.
-La matrice est de taille 8268 équations.
-  Elle contient 212886 termes non nuls si elle est
-symétrique et 417504 termes non nuls si elle n'est pas symétrique.
-  Soit un taux de remplissage de 
- 0.611 %.
-Champ stocké <DEPL> à l'instant  0.000000000000e+00 pour le numéro d'ordre 1
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.01      0.00      0.00
-# Résultat commande #0010 (MECA_STATIQUE): RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   292.28 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0010   user+syst:        0.17s (syst:        0.02s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt103
-# ----------------------------------------------------------------------------------------------
-# Commande #0012 de fort.1, ligne 103
-RESU_LOAD_COMB_01 = CALC_CHAMP(CRITERE='RELATIF',
-                               FORCE='REAC_NODA',
-                               INFO=1,
-                               PARALLELISME_TEMPS='NON',
-                               PRECISION=1e-06,
-                               RESULTAT=RESU_LOAD_COMB_01,
-                               reuse=RESU_LOAD_COMB_01)
-
-Le système linéaire à résoudre a 8268 degrés de liberté:
-   - 7956 sont des degrés de liberté
-physiques
-     (ils sont portés par 1326 noeuds du maillage)
-   - 312 sont les couples de paramètres
-de Lagrange associés
-     aux 156 relations linéaires dualisées.
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.01      0.00      0.00
-# Résultat commande #0012 (CALC_CHAMP): RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   292.95 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0012   user+syst:        0.02s (syst:        0.02s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt114
-# ----------------------------------------------------------------------------------------------
-# Commande #0013 de fort.1, ligne 114
-REAC_LOAD_COMB_01 = POST_RELEVE_T(ACTION=_F(CRITERE='RELATIF',
-                                            FORMAT_C='MODULE',
-                                            GROUP_NO='fixed_node',
-                                            INTITULE='Reac_LOAD_COMB_01',
-                                            MOMENT=('DRX', 'DRY', 'DRZ'),
-                                            MOYE_NOEUD='OUI',
-                                            NOM_CHAM='REAC_NODA',
-                                            OPERATION='EXTRACTION',
-                                            POINT=(0, 0, 0),
-                                            PRECISION=1e-06,
-                                            REPERE='GLOBAL',
-                                            RESULTANTE=('DX', 'DY', 'DZ'),
-                                            RESULTAT=RESU_LOAD_COMB_01),
-                                  INFO=1)
-
-# Résultat commande #0013 (POST_RELEVE_T): REAC_LOAD_COMB_01 ('<00000030>') de type <Table>
-# Mémoire (Mo) :   302.91 /   293.23 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0013   user+syst:        0.00s (syst:        0.02s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt122
-# ----------------------------------------------------------------------------------------------
-# Commande #0014 de fort.1, ligne 122
-IMPR_TABLE(COMMENTAIRE='#',
-           COMM_PARA='',
-           DEBUT_LIGNE='',
-           FIN_LIGNE='\n',
-           FIN_TABLE='',
-           FORMAT='TABLEAU',
-           FORMAT_R='E12.5',
-           IMPR_FONCTION='NON',
-           INFO=1,
-           SEPARATEUR=',',
-           TABLE=REAC_LOAD_COMB_01,
-           TITRE='REACTIONS_LOAD_COMB_01',
-           UNITE=27)
-
-# Mémoire (Mo) :   302.91 /   293.36 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0014   user+syst:        0.02s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt126
-# ----------------------------------------------------------------------------------------------
-# Commande #0015 de fort.1, ligne 126
-M_DUMMY = DEFI_MATERIAU(ELAS=_F(B_ENDOGE=0.0,
-                                COEF_AMOR=1.0,
-                                E=1.0,
-                                K_DESSIC=0.0,
-                                NU=0.3,
-                                RHO=1.0),
-                        INFO=1)
-
-# Résultat commande #0015 (DEFI_MATERIAU): M_DUMMY ('<00000031>') de type <Material>
-# Mémoire (Mo) :   302.91 /   293.36 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0015   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt129
-# ----------------------------------------------------------------------------------------------
-# Commande #0016 de fort.1, ligne 129
-CH_DUMMY = AFFE_MATERIAU(AFFE=_F(MATER=M_DUMMY,
-                                 TOUT='OUI'),
-                         INFO=1,
-                         MODELE=MODELE)
-
-# Résultat commande #0016 (AFFE_MATERIAU): CH_DUMMY ('<00000032>') de type <MaterialField>
-# Mémoire (Mo) :   302.91 /   293.36 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0016   user+syst:        0.02s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt134
-# ----------------------------------------------------------------------------------------------
-# Commande #0017 de fort.1, ligne 134
-TAB_GEOM = POST_ELEM(CARA_ELEM=CARA_ELEM,
-                     CHAM_MATER=CH_DUMMY,
-                     CRITERE='RELATIF',
-                     GEOMETRIE='INITIALE',
-                     INFO=1,
-                     MASS_INER=_F(TOUT='OUI'),
-                     MODELE=MODELE,
-                     MODE_FOURIER=0,
-                     NIVE_COUCHE='MOY',
-                     NUME_COUCHE=1,
-                     PRECISION=1e-06)
-
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
-# Résultat commande #0017 (POST_ELEM): TAB_GEOM ('<00000033>') de type <Table>
-# Mémoire (Mo) :   302.91 /   293.49 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0017   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt140
-# ----------------------------------------------------------------------------------------------
-# Commande #0018 de fort.1, ligne 140
-IMPR_TABLE(COMMENTAIRE='#',
-           COMM_PARA='',
-           DEBUT_LIGNE='',
-           FIN_LIGNE='\n',
-           FIN_TABLE='',
-           FORMAT='TABLEAU',
-           FORMAT_R='E12.5',
-           IMPR_FONCTION='NON',
-           INFO=1,
-           SEPARATEUR=',',
-           TABLE=TAB_GEOM,
-           TITRE='GEOMETRIC_PROPERTIES',
-           UNITE=26)
-
-# Mémoire (Mo) :   302.91 /   293.50 /   208.39 /   200.29 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0018   user+syst:        0.02s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt148
-# ----------------------------------------------------------------------------------------------
-# Commande #0019 de fort.1, ligne 148
-RESU_LOAD_COMB_01 = CALC_CHAMP(CONTRAINTE='SIGM_ELNO',
-                               CRITERE='RELATIF',
-                               CRITERES='SIEQ_ELNO',
-                               FORCE=('REAC_NODA', 'FORC_NODA'),
-                               INFO=1,
-                               PARALLELISME_TEMPS='NON',
-                               PRECISION=1e-06,
-                               RESULTAT=RESU_LOAD_COMB_01,
-                               reuse=RESU_LOAD_COMB_01)
-
-Le système linéaire à résoudre a 8268 degrés de liberté:
-   - 7956 sont des degrés de liberté
-physiques
-     (ils sont portés par 1326 noeuds du maillage)
-   - 312 sont les couples de paramètres
-de Lagrange associés
-     aux 156 relations linéaires dualisées.
-
- ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
- ║ <I> <PREPOST5_1>                                                                               ║
- ║                                                                                                ║
- ║ L'option REAC_NODA est déjà calculée pour le numéro d'ordre 1.                                 ║
- ║  On la recalcule car les                                                                       ║
- ║ données peuvent être différentes.                                                              ║
- ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
-
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.03      0.00      0.00
-# Résultat commande #0019 (CALC_CHAMP): RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   295.57 /   208.39 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0019   user+syst:        0.05s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt154
-# ----------------------------------------------------------------------------------------------
-# Commande #0020 de fort.1, ligne 154
-RESU_LOAD_COMB_01_INF = POST_CHAMP(EXTR_COQUE=_F(NIVE_COUCHE='INF',
-                                                 NOM_CHAM='SIGM_ELNO',
-                                                 NUME_COUCHE=1),
-                                   GROUP_MA='12mm',
-                                   RESULTAT=RESU_LOAD_COMB_01)
-
-# Résultat commande #0020 (POST_CHAMP): RESU_LOAD_COMB_01_INF ('<00000034>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   296.26 /   208.39 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0020   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt159
-# ----------------------------------------------------------------------------------------------
-# Commande #0021 de fort.1, ligne 159
-RESU_LOAD_COMB_01_INF = CALC_CHAMP(CONTRAINTE='SIGM_NOEU',
-                                   CRITERE='RELATIF',
-                                   CRITERES='SIEQ_NOEU',
-                                   INFO=1,
-                                   PARALLELISME_TEMPS='NON',
-                                   PRECISION=1e-06,
-                                   RESULTAT=RESU_LOAD_COMB_01_INF,
-                                   reuse=RESU_LOAD_COMB_01_INF)
-
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
-# Résultat commande #0021 (CALC_CHAMP): RESU_LOAD_COMB_01_INF ('<00000034>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   299.65 /   208.44 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0021   user+syst:        0.03s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt165
-# ----------------------------------------------------------------------------------------------
-# Commande #0022 de fort.1, ligne 165
-RESU_LOAD_COMB_01_MOY = POST_CHAMP(EXTR_COQUE=_F(NIVE_COUCHE='MOY',
-                                                 NOM_CHAM='SIGM_ELNO',
-                                                 NUME_COUCHE=1),
-                                   GROUP_MA='12mm',
-                                   RESULTAT=RESU_LOAD_COMB_01)
-
-# Résultat commande #0022 (POST_CHAMP): RESU_LOAD_COMB_01_MOY ('<00000035>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   299.73 /   208.44 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0022   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt170
-# ----------------------------------------------------------------------------------------------
-# Commande #0023 de fort.1, ligne 170
-RESU_LOAD_COMB_01_MOY = CALC_CHAMP(CONTRAINTE='SIGM_NOEU',
-                                   CRITERE='RELATIF',
-                                   CRITERES='SIEQ_NOEU',
-                                   INFO=1,
-                                   PARALLELISME_TEMPS='NON',
-                                   PRECISION=1e-06,
-                                   RESULTAT=RESU_LOAD_COMB_01_MOY,
-                                   reuse=RESU_LOAD_COMB_01_MOY)
-
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
-# Résultat commande #0023 (CALC_CHAMP): RESU_LOAD_COMB_01_MOY ('<00000035>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   301.52 /   210.21 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0023   user+syst:        0.03s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt176
-# ----------------------------------------------------------------------------------------------
-# Commande #0024 de fort.1, ligne 176
-RESU_LOAD_COMB_01_SUP = POST_CHAMP(EXTR_COQUE=_F(NIVE_COUCHE='SUP',
-                                                 NOM_CHAM='SIGM_ELNO',
-                                                 NUME_COUCHE=1),
-                                   GROUP_MA='12mm',
-                                   RESULTAT=RESU_LOAD_COMB_01)
-
-# Résultat commande #0024 (POST_CHAMP): RESU_LOAD_COMB_01_SUP ('<00000036>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   302.91 /   301.52 /   210.21 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0024   user+syst:        0.00s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt181
-# ----------------------------------------------------------------------------------------------
-# Commande #0025 de fort.1, ligne 181
-RESU_LOAD_COMB_01_SUP = CALC_CHAMP(CONTRAINTE='SIGM_NOEU',
-                                   CRITERE='RELATIF',
-                                   CRITERES='SIEQ_NOEU',
-                                   INFO=1,
-                                   PARALLELISME_TEMPS='NON',
-                                   PRECISION=1e-06,
-                                   RESULTAT=RESU_LOAD_COMB_01_SUP,
-                                   reuse=RESU_LOAD_COMB_01_SUP)
-
-#2      Calculs elementaires et assemblages               CPU (USER+SYST/SYST/ELAPS):      0.00      0.00      0.00
-# Résultat commande #0025 (CALC_CHAMP): RESU_LOAD_COMB_01_SUP ('<00000036>') de type <ElasticResult>
-# Dépend de :
-# - RESU_LOAD_COMB_01 ('<00000008>') de type <ElasticResult>
-# Mémoire (Mo) :   303.68 /   302.33 /   211.98 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0025   user+syst:        0.03s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt199
-# ----------------------------------------------------------------------------------------------
-# Commande #0026 de fort.1, ligne 199
-IMPR_RESU(FICHIER_UNIQUE='OUI',
-          FORMAT='MED',
-          INFO=1,
-          PROC0='OUI',
-          RESU=(_F(IMPR_NOM_VARI='OUI',
-                   INFO_MAILLAGE='NON',
-                   NOM_CHAM=('DEPL', 'REAC_NODA', 'FORC_NODA'),
-                   NOM_CHAM_MED=('DEPL_LOAD_COMB_01', 'REAC_LOAD_COMB_01', 'FORC_LOAD_COMB_01'),
-                   RESULTAT=RESU_LOAD_COMB_01),
-                _F(IMPR_NOM_VARI='OUI',
-                   INFO_MAILLAGE='NON',
-                   NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
-                   NOM_CHAM_MED=('S_INF_LOAD_COMB_01', 'VM_INF_LOAD_COMB_01'),
-                   RESULTAT=RESU_LOAD_COMB_01_INF),
-                _F(IMPR_NOM_VARI='OUI',
-                   INFO_MAILLAGE='NON',
-                   NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
-                   NOM_CHAM_MED=('S_MID_LOAD_COMB_01', 'VM_MID_LOAD_COMB_01'),
-                   RESULTAT=RESU_LOAD_COMB_01_MOY),
-                _F(IMPR_NOM_VARI='OUI',
-                   INFO_MAILLAGE='NON',
-                   NOM_CHAM=('SIGM_NOEU', 'SIEQ_NOEU'),
-                   NOM_CHAM_MED=('S_SUP_LOAD_COMB_01', 'VM_SUP_LOAD_COMB_01'),
-                   RESULTAT=RESU_LOAD_COMB_01_SUP)),
-          UNITE=8,
-          VERSION_MED='3.3.1')
-
-
- ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
- ║ <A> <RESULT3_12>                                                                               ║
- ║                                                                                                ║
- ║ Le fichier correspondant à l'unité logique renseignée pour l'écriture de résultats au format   ║
- ║ MED est de type ASCII.                                                                         ║
- ║ Cela peut engendrer l'affichage de messages intempestifs provenant de                          ║
- ║ la bibliothèque MED. Il n'y a toutefois aucun risque de résultats faux.                        ║
- ║ Pour supprimer                                                                                 ║
- ║ l'émission de ce message d'alarme, il faut donner la valeur BINARY au  mot-clé TYPE de         ║
- ║ DEFI_FICHIER.                                                                                  ║
- ║                                                                                                ║
- ║ Ceci est une alarme. Si vous ne comprenez pas le sens de cette                                 ║
- ║ alarme, vous pouvez obtenir des                                                                ║
- ║ résultats inattendus !                                                                         ║
- ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
-
-
- ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
- ║ <A> <RESULT3_12>                                                                               ║
- ║                                                                                                ║
- ║ Le fichier correspondant à l'unité logique renseignée pour l'écriture de résultats au format   ║
- ║ MED est de type ASCII.                                                                         ║
- ║ Cela peut engendrer l'affichage de messages intempestifs provenant de                          ║
- ║ la bibliothèque MED. Il n'y a toutefois aucun risque de résultats faux.                        ║
- ║ Pour supprimer                                                                                 ║
- ║ l'émission de ce message d'alarme, il faut donner la valeur BINARY au  mot-clé TYPE de         ║
- ║ DEFI_FICHIER.                                                                                  ║
- ║                                                                                                ║
- ║ Ceci est une alarme. Si vous ne comprenez pas le sens de cette                                 ║
- ║ alarme, vous pouvez obtenir des                                                                ║
- ║ résultats inattendus !                                                                         ║
- ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
-
-Création du fichier au format MED 3.3.1.
-
-# Mémoire (Mo) :   305.39 /   305.39 /   211.98 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0026   user+syst:        0.06s (syst:        0.00s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-
-.. _stg1_txt204
-# ----------------------------------------------------------------------------------------------
-# Commande #0027 de fort.1, ligne 204
-FIN(INFO_RESU='NON',
-    RETASSAGE='NON')
+Publishing the result of the current command AFFE_MODELE...
 
 Saving objects...
 pi                       <class 'float'>
@@ -675,19 +196,6 @@ nan                      <class 'float'>
 shell                    <class 'libaster.Mesh'>
 MAIL                     <class 'libaster.Mesh'>
 MODELE                   <class 'libaster.Model'>
-M_STEEL_S355             <class 'libaster.Material'>
-CHAM_MATER               <class 'libaster.MaterialField'>
-CARA_ELEM                <class 'libaster.ElementaryCharacteristics'>
-BC_RULE_1                <class 'libaster.MechanicalLoadReal'>
-ACCEL_1                  <class 'libaster.MechanicalLoadReal'>
-RESU_LOAD_COMB_01        <class 'libaster.ElasticResult'>
-REAC_LOAD_COMB_01        <class 'libaster.Table'>
-M_DUMMY                  <class 'libaster.Material'>
-CH_DUMMY                 <class 'libaster.MaterialField'>
-TAB_GEOM                 <class 'libaster.Table'>
-RESU_LOAD_COMB_01_INF    <class 'libaster.ElasticResult'>
-RESU_LOAD_COMB_01_MOY    <class 'libaster.ElasticResult'>
-RESU_LOAD_COMB_01_SUP    <class 'libaster.ElasticResult'>
 
  ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
  ║ <I> <CATAMESS_89>                                                                              ║
@@ -698,41 +206,24 @@ RESU_LOAD_COMB_01_SUP    <class 'libaster.ElasticResult'>
  ║ choisies d'ignorer sont précédées de (*).                                                      ║
  ║     Nombre d'occurrences pour chacune des alarmes :                                            ║
  ║                                                                                                ║
- ║           RESULT3_12           émise    2 fois                                                 ║
+ ║           aucune alarme                                                                        ║
  ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
 
  ---------------------------------------------------------------------------
  Concepts de la base: G
     Nom        Type                Taille (Mo)         Nombre      Nombre de
                                                      d'objets       segments
-    TOTAL                                41.02            512            702
+    TOTAL                                30.64             81            168
   
     00000001   MAILLAGE_SDASTER           0.18             36             62
-    00000030   TABLE_SDASTER              0.00             27             27
-    00000002   MODELE_SDASTER             0.11              9             14
-    00000003   MATER_SDASTER              0.00              7              7
-    00000004   CHAM_MATER                 0.00              8             13
-    00000005   CARA_ELEM                  0.05             26             31
-    00000034   EVOL_ELAS                  1.77             47             60
-    00000006   CHAR_MECA                  0.14             55             75
-    00000007   CHAR_MECA                  0.00             40             45
-    00000008   EVOL_ELAS                  4.40             48             62
-    00000009   *L_CHARGES                 0.00              4              4
-    0000000a   *NUME_EQUA                 0.37              8             13
-    00000035   EVOL_ELAS                  1.77             47             60
-    00000036   EVOL_ELAS                  1.77             47             60
-    00000033   TABLE_SDASTER              0.00             41             41
-    00000031   MATER_SDASTER              0.00              7              7
-    00000032   CHAM_MATER                 0.00              8             13
     &FOZERO                               0.00              2              2
     &&_NUM_C                              0.00              1              1
     &CATA                                30.46             42            103
-    &&NMDOME                              0.00              2              2
  (*) sous-objets non accessible directement
  ---------------------------------------------------------------------------
 Nom de la base                          :  GLOBALE
      Nombre d'enregistrements utilisés       : 
-168
+152
      Nombre d'enregistrements maximum        :  2684354
      Nombre d'enregistrements par
 fichier    :  15728
@@ -741,13 +232,13 @@ fichier    :  15728
 en lecture         :  6
      Volume des accès en lecture             :          4.69 Mo.
      Nombre
-total d'accès en écriture        :  395
-     Volume des accès en écriture            :        308.59
+total d'accès en écriture        :  374
+     Volume des accès en écriture            :        292.19
 Mo.
-     Nombre d'identificateurs utilisés       :  948
+     Nombre d'identificateurs utilisés       :  188
      Taille maximum du répertoire           
 :  2000
-     Pourcentage d'utilisation du répertoire :  47 %
+     Pourcentage d'utilisation du répertoire :  9 %
 
 Nom de la base                          :  VOLATILE
      Nombre d'enregistrements utilisés       : 
@@ -763,82 +254,41 @@ en lecture         :  0
 total d'accès en écriture        :  291
      Volume des accès en écriture            :        227.34
 Mo.
-     Nombre d'identificateurs utilisés       :  727
+     Nombre d'identificateurs utilisés       :  39
      Taille maximum du répertoire           
 :  2000
-     Pourcentage d'utilisation du répertoire :  36 %
+     Pourcentage d'utilisation du répertoire :  1 %
 
 <I> <FIN> ARRET NORMAL DANS "FIN" PAR APPEL A "JEFINI".
   
- <I> <FIN> MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :                     201.49 Mo
- <I> <FIN> MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :                     211.98 Mo
- <I> <FIN> MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS LORS DE L'EXECUTION :     305.52 Mo
+ <I> <FIN> MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :                     184.66 Mo
+ <I> <FIN> MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :                     208.39 Mo
+ <I> <FIN> MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS LORS DE L'EXECUTION :     283.26 Mo
   
  <I>       FERMETURE DES BASES EFFECTUEE
   
    STATISTIQUES CONCERNANT L'ALLOCATION DYNAMIQUE :
-     TAILLE CUMULEE MAXIMUM            :                  212  Mo.
-     TAILLE CUMULEE LIBEREE            :                   44  Mo.
-     NOMBRE TOTAL D'ALLOCATIONS        :                87693
-     NOMBRE TOTAL DE LIBERATIONS       :                87673
+     TAILLE CUMULEE MAXIMUM            :                  208  Mo.
+     TAILLE CUMULEE LIBEREE            :                   27  Mo.
+     NOMBRE TOTAL D'ALLOCATIONS        :                14632
+     NOMBRE TOTAL DE LIBERATIONS       :                14612
      APPELS AU MECANISME DE LIBERATION :                    0
-     TAILLE MEMOIRE CUMULEE RECUPEREE  :                    1  Mo.
+     TAILLE MEMOIRE CUMULEE RECUPEREE  :                    0  Mo.
      VOLUME DES LECTURES               :                    0  Mo.
-     VOLUME DES ECRITURES              :                    4  Mo.
+     VOLUME DES ECRITURES              :                    0  Mo.
   
-   MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :     201.49 Mo
+   MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :     184.66 Mo
      - IMPOSE DE NOMBREUX ACCES DISQUE
      - RALENTIT LA VITESSE D'EXECUTION
-   MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :     211.98 Mo
+   MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :     208.39 Mo
      - LIMITE LES ACCES DISQUE
      - AMELIORE LA VITESSE D'EXECUTION
-   MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS     :     305.52 Mo
+   MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS     :     283.26 Mo
      - COMPREND LA MEMOIRE CONSOMMEE PAR  JEVEUX, 
        LE SUPERVISEUR PYTHON, LES LIBRAIRIES EXTERNES
   
- <I>       FIN D'EXECUTION LE : LU-26-JANV-2026 22:01:02
-Signature of pickled file   : 012004359d8d81f757d5de239a79370b8f62346d618029866b9d48441724bcc9
-Signature of info file      : 8d2e73bba6d84c22080d9bbad54fd0f9d795d0339a630db9bfacdca52e070259
-Signature of Jeveux database: df6fb00ce4640378cc81849a7c1ab6b0073df32e675e30e3489eef8bca78319e
-
- ********************************************************************************
- * COMMAND                  :       USER :     SYSTEM :   USER+SYS :    ELAPSED *
- ********************************************************************************
- * DEBUT                    :       0.09 :       0.16 :       0.25 :       0.00 *
- * DEFI_FICHIER             :       0.00 :       0.00 :       0.00 :       0.00 *
- * LIRE_MAILLAGE            :       0.03 :       0.05 :       0.08 :       0.00 *
- * AFFE_MODELE              :       0.02 :       0.00 :       0.02 :       0.00 *
- * DEFI_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.00 *
- * AFFE_MATERIAU            :       0.02 :       0.00 :       0.02 :       0.00 *
- * AFFE_CARA_ELEM           :       0.00 :       0.00 :       0.00 :       0.00 *
- * AFFE_CHAR_MECA           :       0.00 :       0.00 :       0.00 :       0.00 *
- * AFFE_CHAR_MECA           :       0.00 :       0.00 :       0.00 :       0.00 *
- * MECA_STATIQUE            :       0.17 :       0.02 :       0.19 :       0.00 *
- * CALC_CHAMP               :       0.02 :       0.02 :       0.03 :       0.00 *
- * POST_RELEVE_T            :       0.00 :       0.02 :       0.02 :       0.00 *
- * IMPR_TABLE               :       0.02 :       0.00 :       0.02 :       0.00 *
- * DEFI_MATERIAU            :       0.00 :       0.00 :       0.00 :       0.00 *
- * AFFE_MATERIAU            :       0.02 :       0.00 :       0.02 :       0.00 *
- * POST_ELEM                :       0.00 :       0.00 :       0.00 :       0.00 *
- * IMPR_TABLE               :       0.02 :       0.00 :       0.02 :       0.00 *
- * CALC_CHAMP               :       0.05 :       0.00 :       0.05 :       0.00 *
- * POST_CHAMP               :       0.00 :       0.00 :       0.00 :       0.00 *
- * CALC_CHAMP               :       0.03 :       0.00 :       0.03 :       0.00 *
- * POST_CHAMP               :       0.00 :       0.00 :       0.00 :       0.00 *
- * CALC_CHAMP               :       0.03 :       0.00 :       0.03 :       0.00 *
- * POST_CHAMP               :       0.00 :       0.00 :       0.00 :       0.00 *
- * CALC_CHAMP               :       0.03 :       0.00 :       0.03 :       0.00 *
- * IMPR_RESU                :       0.06 :       0.00 :       0.06 :       0.00 *
- * FIN                      :       0.14 :       0.17 :       0.31 :       0.00 *
- *  . check syntax          :       0.05 :       0.00 :       0.05 :       0.00 *
- *  . fortran               :       0.41 :       0.36 :       0.77 :       0.00 *
- ********************************************************************************
- * TOTAL_JOB                :       0.75 :       0.42 :       1.17 :       0.00 *
- ********************************************************************************
-
-# Mémoire (Mo) :   305.52 /    95.28 /   211.98 /   201.49 (VmPeak / VmSize / Optimum / Minimum)
-# Fin commande #0027   user+syst:        0.14s (syst:        0.17s, elaps:        0.00s)
-# ----------------------------------------------------------------------------------------------
-End of the Code_Aster execution
-Exited
-EXECUTION_CODE_ASTER_EXIT_7074=0
+ <I>       FIN D'EXECUTION LE : MA-27-JANV-2026 12:29:27
+Signature of pickled file   : a56e7089fe5c98aa9d14410166d8fc90ddef658a5773c38c74b5c2d52b1fbe1d
+Signature of info file      : 9bd7699a92a285e6659c009047f5c73a5df7d4a7c434ec0a89a14b2074886367
+Signature of Jeveux database: 118d2c855073e5437062f17116bc76da0387530497c041e91a85a15a95981f2a
+EXECUTION_CODE_ASTER_EXIT_630=0

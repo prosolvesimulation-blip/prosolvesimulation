@@ -5,64 +5,30 @@
             "_meshFile": "shell.med",
             "type": "COQUE_3D",
             "phenomenon": "MECANIQUE",
-            "_category": "2D",
-            "section_type": "SHELL",
-            "profile_name": "Custom",
-            "section_params": {
-                "thickness": "20",
-                "offset": "10",
-                "vx": 1,
-                "vy": 0,
-                "vz": 0
-            }
-        }
-    ],
-    "materials": [
+            "_category": "2D"
+        },
         {
-            "name": "Steel_S355",
-            "E": 210000000000,
-            "nu": 0.3,
-            "rho": 7850,
-            "assignedGroups": []
+            "group": "_FULL_MESH_",
+            "_meshFile": "shell.med",
+            "type": "COQUE_3D",
+            "phenomenon": "MECANIQUE",
+            "_category": "2D"
         }
     ],
-    "restrictions": [
-        {
-            "name": "BC_RULE_1",
-            "group": "fixed_node",
-            "dof": {
-                "DX": 0,
-                "DY": 0,
-                "DZ": 0,
-                "DRX": 0,
-                "DRY": 0,
-                "DRZ": 0
-            }
+    "materials": [],
+    "restrictions": [],
+    "loads": [],
+    "load_cases": [],
+    "analysis": {
+        "type": "STATIQUE",
+        "parameters": {
+            "time_stepping": "AUTO",
+            "max_iter": 20,
+            "precision": 1e-06
         }
-    ],
-    "loads": [
-        {
-            "name": "ACCEL_1",
-            "type": "PESANTEUR",
-            "direction": [
-                0,
-                0,
-                -1
-            ],
-            "gravite": 9.81
-        }
-    ],
-    "load_cases": [
-        {
-            "name": "LOAD_COMB_01",
-            "loads": [
-                "ACCEL_1"
-            ],
-            "restrictions": [
-                "BC_RULE_1"
-            ]
-        }
-    ],
+    },
+    "contacts": [],
+    "connections": [],
     "meshes": [
         {
             "name": "shell",

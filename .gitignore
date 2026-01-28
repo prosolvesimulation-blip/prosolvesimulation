@@ -50,6 +50,8 @@ temp_verify_vtk/
 !package.json
 !tsconfig.json
 !package-lock.json
+!frontend/src/data/modelOptions.json
+!frontend/src/data/contactPairs.json
 
 # IDEs
 .vscode/

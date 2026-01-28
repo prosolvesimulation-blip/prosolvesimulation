@@ -15,6 +15,7 @@ import AnalysisConfig from './config/AnalysisConfig'
 import ContactConfig from './config/ContactConfig'
 import ConnectionConfig from './config/ConnectionsConfig'
 import VerificationConfig from './config/VerificationConfig'
+import SummaryConfig from './config/SummaryConfig'
 
 interface StructuralWorkspaceProps {
     onBack: () => void
@@ -22,7 +23,7 @@ interface StructuralWorkspaceProps {
     setProjectPath: (path: string | null) => void
 }
 
-type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report'
+type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report' | 'summary'
 
 interface ProjectConfig {
     geometries: any[]
@@ -262,6 +263,7 @@ export default function StructuralWorkspace({
                         const allGroupsMerged: any = {};
                         const groupNames: string[] = [];
                         const nodeNames: string[] = [];
+                        const fullGroupObjects: any[] = []; // NEW: Store full group objects
 
                         Object.entries(cargo).forEach(([fileName, data]: [string, any]) => {
                             const groups = data.groups;
@@ -272,11 +274,18 @@ export default function StructuralWorkspace({
                                 console.log(`DEBUG: [Workspace] Group ${gName} has med_type: ${gInfo.med_type}`);
                                 groupNames.push(gName);
                                 if (gInfo.category === 'Node') nodeNames.push(gName);
+                                
+                                // NEW: Add full group object with all metadata
+                                fullGroupObjects.push({
+                                    name: gName,
+                                    meshFile: fileName,
+                                    ...gInfo // Include med_type, category, count, etc.
+                                });
                             });
                         });
 
                         setAllGroupsData(allGroupsMerged);
-                        setAvailableGroups(Array.from(new Set(groupNames)));
+                        setAvailableGroups(groupNames); // Pass array of group names instead of full objects
                         setNodeGroups(Array.from(new Set(nodeNames)));
 
                         // Update Project Geometries automatically
@@ -332,7 +341,8 @@ export default function StructuralWorkspace({
         { id: '3d-view' as Tab, label: '3D View', icon: '🧊' },
         { id: 'verification' as Tab, label: 'Verification', icon: '⚖️' },
         { id: 'results' as Tab, label: 'Results', icon: '📈' },
-        { id: 'report' as Tab, label: 'Report', icon: '📝' }
+        { id: 'report' as Tab, label: 'Report', icon: '📝' },
+        { id: 'summary' as Tab, label: 'Summary', icon: '📋' }
     ]
 
     return (
@@ -531,7 +541,7 @@ export default function StructuralWorkspace({
                                 <RestrictionConfig
                                     key={projectPath}
                                     projectPath={projectPath}
-                                    availableGroups={nodeGroups.length > 0 ? nodeGroups : availableGroups} // Prefer node groups
+                                    availableGroups={availableGroups} // Pass all groups - filtering done inside component
                                     initialRestrictions={projectConfig.restrictions}
                                     onUpdate={updateRestrictions}
                                 />
@@ -541,6 +551,7 @@ export default function StructuralWorkspace({
                                     key={projectPath}
                                     projectPath={projectPath}
                                     availableGroups={availableGroups}
+                                    meshGroups={allGroupsData}
                                     initialLoads={projectConfig.loads}
                                     onUpdate={updateLoads}
                                 />
@@ -592,6 +603,11 @@ export default function StructuralWorkspace({
                                 <ReportTab
                                     key={projectPath}
                                     projectPath={projectPath}
+                                />
+                            )}
+                            {activeTab === 'summary' && (
+                                <SummaryConfig
+                                    projectConfig={projectConfig}
                                 />
                             )}
                         </div>

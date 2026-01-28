@@ -50,10 +50,11 @@ def build_geometry(geometry_list, model_name="MODELE", result_name="CARA_ELEM"):
             })
 
         elif section_type in ["I_SECTION", "RECTANGLE", "BOX", "CIRCLE", "TUBE", "BEAM"]:
-            # Model assignment
+            # Model assignment - Use user selection from frontend
+            beam_model = item.get("type", "POU_D_T")  # Fallback to POU_D_T for safety
             model_items.append({
                 "group": group,
-                "modelisation": "POU_D_T"
+                "modelisation": beam_model
             })
             
             # Cara assignment

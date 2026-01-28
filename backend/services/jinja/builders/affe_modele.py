@@ -9,7 +9,7 @@ def build_affe_modele(models_list, mesh_name="MAIL", result_name="MODELE"):
         item = {
             "group": model["group"],
             "modelisation": model["type"],
-            "phenomene": "MECANIQUE" # Padrão, mas poderia vir do JSON
+            "phenomene": model.get("phenomenon", "MECANIQUE") # Use physics from frontend, default to MECANIQUE
         }
         items.append(item)
 

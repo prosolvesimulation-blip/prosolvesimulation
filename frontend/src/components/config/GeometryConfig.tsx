@@ -50,18 +50,33 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
                 .map((g: any) => {
                     const isBeam = g._category === '1D'
                     const isShell = g._category === '2D'
+                    
+                    // Preserve original category from ModelConfig
+                    const originalCategory = g.section_type || (isBeam ? 'BEAM' : isShell ? 'SHELL' : 'UNKNOWN')
 
+                    // Determine profile type for calculation
+                    let profileType = g.profile_type
+                    if (!profileType) {
+                        if (isBeam) {
+                            profileType = 'I_SECTION'  // Default for beams
+                        } else if (isShell) {
+                            profileType = 'SHELL'      // Only option for shells
+                        }
+                    }
+
+                    // Set default parameters based on profile type
                     let params = {}
-                    if (isBeam) {
-                        params = { ...PROFILE_TYPES['I_SECTION'].default, ...(g.section_params || {}) }
+                    if (isBeam && profileType in PROFILE_TYPES) {
+                        params = { ...PROFILE_TYPES[profileType as keyof typeof PROFILE_TYPES].default, ...(g.section_params || {}) }
                     } else if (isShell) {
                         params = { ...SHELL_DEFAULT, ...(g.section_params || {}) }
                     }
 
                     return {
                         ...g,
-                        section_type: g.section_type || (isBeam ? 'I_SECTION' : 'SHELL'),
-                        profile_name: g.profile_name || 'Custom',
+                        section_type: originalCategory,      // Keep original category ('BEAM', 'SHELL')
+                        profile_type: profileType,           // Profile for calculation ('I_SECTION', 'SHELL')
+                        profile_name: g.profile_name || PROFILE_TYPES[profileType as keyof typeof PROFILE_TYPES]?.label || 'Custom',
                         section_params: params
                     }
                 })
@@ -103,7 +118,7 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    type: selected.section_type,
+                    type: selected.profile_type,  // Send profile type for calculation
                     params: selected.section_params
                 })
             })
@@ -138,9 +153,14 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
         ))
     }
 
-    const handleSectionTypeChange = (idx: number, type: string) => {
+    const handleSectionTypeChange = (idx: number, profileType: string) => {
         setGeometries(prev => prev.map((g, i) =>
-            i === idx ? { ...g, section_type: type, profile_name: 'Custom', section_params: { ...(PROFILE_TYPES as any)[type].default } } : g
+            i === idx ? { 
+                ...g, 
+                profile_type: profileType,  // Update profile type for calculation
+                profile_name: PROFILE_TYPES[profileType as keyof typeof PROFILE_TYPES]?.label || 'Custom',
+                section_params: { ...(PROFILE_TYPES as any)[profileType].default } 
+            } : g
         ))
     }
 
@@ -269,7 +289,7 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
                                         <div className="bg-slate-950/50 border border-slate-800 p-1">
                                             <select
                                                 className="w-full bg-transparent text-xs font-bold text-white p-2.5 focus:outline-none border-l-2 border-orange-500 hover:bg-slate-900 transition-all cursor-pointer"
-                                                value={selected.section_type || 'I_SECTION'}
+                                                value={selected.profile_type || 'I_SECTION'}
                                                 onChange={(e) => handleSectionTypeChange(selectedIdx, e.target.value)}
                                                 disabled={!isBeam}
                                             >

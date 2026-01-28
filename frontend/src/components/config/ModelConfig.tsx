@@ -11,6 +11,23 @@ import {
     Database,
     AlertCircle
 } from 'lucide-react'
+import modelOptionsData from '../../data/modelOptions.json'
+
+type PhysicsApplication = 'MECANIQUE' | 'THERMIQUE' | 'ACOUSTIQUE'
+
+interface ModelOption {
+    value: string
+    label: string
+    category: string
+}
+
+interface PhysicsDomain {
+    application: PhysicsApplication
+    label: string
+    models: {
+        [dimension: string]: ModelOption[]
+    }
+}
 
 interface MeshGroup {
     name: string
@@ -31,25 +48,25 @@ interface ModelConfigProps {
     onUpdate?: (geometries: any[]) => void
 }
 
-const MODEL_OPTIONS = {
-    '1D': [
-        { value: 'POU_D_T', label: 'Beam (Timoshenko) - POU_D_T' },
-        { value: 'POU_D_E', label: 'Beam (Euler) - POU_D_E' },
-        { value: 'BARRE', label: 'Truss/Bar - BARRE' },
-        { value: 'CABLE', label: 'Cable - CABLE' }
-    ],
-    '2D': [
-        { value: 'DKT', label: 'Plate (Thin) - DKT' },
-        { value: 'DST', label: 'Plate (Thick) - DST' },
-        { value: 'COQUE_3D', label: 'Shell 3D - COQUE_3D' },
-        { value: 'MEMBRANE', label: 'Membrane - MEMBRANE' },
-        { value: 'C_PLAN', label: 'Plane Strain - C_PLAN' },
-        { value: 'D_PLAN', label: 'Plane Stress - D_PLAN' },
-        { value: 'AXIS', label: 'Axisymmetric - AXIS' }
-    ],
-    '3D': [
-        { value: '3D', label: 'Solid/Volume - 3D' }
-    ]
+const ELEMENT_TYPE_MAP: Record<string, '1D' | '2D' | '3D'> = {
+    // 1D Elements
+    'SEG': '1D',
+    'POU_D': '1D', 
+    'BARRE': '1D',
+    'CABLE': '1D',
+    
+    // 2D Elements  
+    'QUAD': '2D',
+    'TRIA': '2D',
+    'DKT': '2D',
+    'DST': '2D',
+    'COQUE': '2D',
+    'MEMBRANE': '2D',
+    
+    // 3D Elements
+    'HEXA': '3D',
+    'TETRA': '3D', 
+    'PENTA': '3D'
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -68,6 +85,94 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
     const isFirstRender = useRef(true)
     const lastGroupsSignatureRef = useRef<string>('')
     const lastExportSignatureRef = useRef<string>('')
+
+    // Physics detection and filtering functions
+    const getAvailablePhysicsForElementType = (medType: string): PhysicsApplication[] => {
+        const physicsMap: Record<string, PhysicsApplication[]> = {
+            // Beam elements
+            'SEG': ['MECANIQUE', 'THERMIQUE'],
+            'POU_D': ['MECANIQUE'],
+            'BARRE': ['MECANIQUE'],
+            'CABLE': ['MECANIQUE'],
+            
+            // Shell elements  
+            'QUAD': ['MECANIQUE', 'THERMIQUE', 'ACOUSTIQUE'],
+            'TRIA': ['MECANIQUE', 'THERMIQUE', 'ACOUSTIQUE'],
+            'DKT': ['MECANIQUE'],
+            'DST': ['MECANIQUE'],
+            'COQUE': ['MECANIQUE', 'THERMIQUE'],
+            'MEMBRANE': ['MECANIQUE', 'THERMIQUE'],
+            
+            // Solid elements
+            'HEXA': ['MECANIQUE', 'THERMIQUE', 'ACOUSTIQUE'],
+            'TETRA': ['MECANIQUE', 'THERMIQUE', 'ACOUSTIQUE'],
+            'PENTA': ['MECANIQUE', 'THERMIQUE', 'ACOUSTIQUE'],
+            
+            // Special cases
+            'AXIS': ['MECANIQUE', 'THERMIQUE']
+        }
+        
+        // Find matching physics for this element type
+        for (const [element, physics] of Object.entries(physicsMap)) {
+            if (medType.includes(element)) {
+                return physics
+            }
+        }
+        
+        return ['MECANIQUE'] // Default fallback
+    }
+
+    const getFilteredModelOptionsByElementType = (
+        physics: PhysicsApplication, 
+        medType: string, 
+        fallbackCategory: string
+    ): ModelOption[] => {
+        // Determine the validated category
+        const validatedCategory = getValidatedCategory(medType, fallbackCategory)
+        
+        // Get models from JSON for this category
+        const physicsDomain = (modelOptionsData as PhysicsDomain[]).find(p => p.application === physics)
+        const availableModels = physicsDomain?.models[validatedCategory] || []
+        
+        // Additional filtering based on specific element type
+        return availableModels.filter(model => {
+            const modelValue = model.value.toUpperCase()
+            const medTypeUpper = medType.toUpperCase()
+            
+            // Specific element type restrictions
+            if (medTypeUpper.includes('SEG')) {
+                return ['POU_D_T', 'POU_D_E', 'BARRE', 'CABLE'].includes(modelValue)
+            }
+            
+            if (medTypeUpper.includes('QUAD') || medTypeUpper.includes('TRIA')) {
+                return ['DKT', 'DST', 'COQUE_3D', 'MEMBRANE', 'C_PLAN', 'D_PLAN', 'AXIS'].includes(modelValue)
+            }
+            
+            if (medTypeUpper.includes('HEXA') || medTypeUpper.includes('TETRA')) {
+                return modelValue === '3D' || modelValue.startsWith('3D_')
+            }
+            
+            // Thermal models
+            if (physics === 'THERMIQUE') {
+                return modelValue.includes('PLAN') || modelValue.includes('AXIS') || 
+                       modelValue.includes('COQUE') && modelValue !== 'COQUE_3D'
+            }
+            
+            return true // Default: allow all models for this category
+        })
+    }
+
+    const getValidatedCategory = (medType: string, fallbackCategory: string): string => {
+        if (!medType) return fallbackCategory
+        
+        // Try to determine category from MED type first
+        const medTypeBase = medType.split('_')[0]
+        const medCategory = ELEMENT_TYPE_MAP[medTypeBase]
+        if (medCategory) return medCategory
+        
+        // Fallback to existing detection logic
+        return fallbackCategory
+    }
 
     // Auto-select first group if none selected
     useEffect(() => {
@@ -90,16 +195,19 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
             const loadedGroups: MeshGroup[] = []
             Object.entries(meshGroups).forEach(([fileName, groupsInFile]: [string, any]) => {
                 Object.entries(groupsInFile).forEach(([groupName, info]: [string, any]) => {
-                    const category = info.category || detectCategory(info.types || {})
-                    if (category === 'Node' || category === 'Point') return
+                    const basicCategory = info.category || detectCategory(info.types || {})
+                    if (basicCategory === 'Node' || basicCategory === 'Point') return
 
                     const compStr = (info.types && Object.keys(info.types).length > 0)
                         ? Object.entries(info.types)
                             .map(([t, q]) => `${t}:${q}`)
                             .join(', ')
-                        : category
+                        : basicCategory
 
                     const existingConfig = currentGeometries.find((c: any) => c.group === groupName && c._meshFile === fileName)
+                    
+                    // Use validated category based on MED type
+                    const validatedCategory = getValidatedCategory(info.med_type, basicCategory)
 
                     loadedGroups.push({
                         name: groupName,
@@ -107,14 +215,19 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                         selected: currentGeometries.length > 0 ? !!existingConfig : true,
                         count: info.count,
                         composition: compStr,
-                        category: category,
-                        model: existingConfig?.type || detectDefaultModel(category),
-                        phenomenon: 'MECANIQUE',
+                        category: validatedCategory, // Use validated category
+                        model: existingConfig?.type || detectDefaultModel(validatedCategory),
+                        phenomenon: existingConfig?.phenomenon || 'MECANIQUE', // Use existing or default
                         medType: info.med_type // NEW
                     })
                 })
             })
-            console.log("DEBUG: [ModelConfig] Loaded groups with types:", loadedGroups.map(g => ({ name: g.name, type: g.medType })))
+            console.log("DEBUG: [ModelConfig] Loaded groups with types:", loadedGroups.map(g => ({ 
+                name: g.name, 
+                medType: g.medType, 
+                category: g.category, 
+                validatedCategory: getValidatedCategory(g.medType || '', g.category)
+            })))
             setGroups(loadedGroups)
         }
     }, [meshGroups, currentGeometries])
@@ -138,8 +251,9 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                             ...existing,
                             type: g.model,
                             formulation: (g.model === 'DKT' || g.model === 'DST') ? g.model : undefined,
-                            phenomenon: 'MECANIQUE',
-                            _category: g.category
+                            phenomenon: g.phenomenon, // Use dynamic physics instead of hardcoded
+                            _category: g.category,
+                            section_type: g.category === '1D' ? 'BEAM' : g.category === '2D' ? 'SHELL' : g.category === '3D' ? 'SOLID' : undefined
                         }
                     })()
                 }))
@@ -179,6 +293,23 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
         setGroups(prev => prev.map(g =>
             (g.meshFile === meshFile && g.name === name) ? { ...g, model: newModel } : g
         ))
+    }
+
+    const handlePhysicsChange = (meshFile: string, name: string, newPhysics: PhysicsApplication) => {
+        setGroups(prev => prev.map(g => {
+            if (g.meshFile === meshFile && g.name === name) {
+                const availableModels = getFilteredModelOptionsByElementType(newPhysics, g.medType || '', g.category)
+                const currentModelValid = availableModels.some(m => m.value === g.model)
+                const newModel = currentModelValid ? g.model : availableModels[0]?.value || ''
+                
+                return {
+                    ...g,
+                    phenomenon: newPhysics,
+                    model: newModel
+                }
+            }
+            return g
+        }))
     }
 
     const toggleAll = (select: boolean) => {
@@ -386,6 +517,41 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
 
                                             <div className="relative z-10">
                                                 <select
+                                                    value={selectedGroup.phenomenon}
+                                                    onChange={(e) => handlePhysicsChange(selectedGroup.meshFile, selectedGroup.name, e.target.value as PhysicsApplication)}
+                                                    disabled={!selectedGroup.selected}
+                                                    className="w-full bg-[#0B0F19] text-sm font-bold text-white p-4 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-500/50 appearance-none transition-all mb-4"
+                                                >
+                                                    {getAvailablePhysicsForElementType(selectedGroup.medType || '').map(physics => {
+                                                        const domain = (modelOptionsData as PhysicsDomain[]).find(p => p.application === physics)
+                                                        return (
+                                                            <option key={physics} value={physics}>
+                                                                {domain?.label || physics}
+                                                            </option>
+                                                        )
+                                                    })}
+                                                </select>
+                                                <div className="absolute right-4 top-[84px] pointer-events-none text-slate-500">
+                                                    <ChevronRight size={14} className="rotate-90" />
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section className="bg-slate-900/30 border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-cyan-500/20 transition-colors">
+                                            <div className="absolute top-0 right-0 p-20 bg-cyan-500/5 blur-[60px] rounded-full group-hover:bg-cyan-500/10 transition-all" />
+
+                                            <div className="flex items-center gap-3 mb-6 relative z-10">
+                                                <div className="p-2 bg-slate-950 rounded-lg border border-white/10">
+                                                    <Settings2 className="w-4 h-4 text-cyan-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Model Selection</h4>
+                                                    <p className="text-[9px] text-slate-500">Element: {selectedGroup.medType || selectedGroup.category}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="relative z-10">
+                                                <select
                                                     value={selectedGroup.model}
                                                     onChange={(e) => handleModelChange(selectedGroup.meshFile, selectedGroup.name, e.target.value)}
                                                     disabled={!selectedGroup.selected}
@@ -394,21 +560,20 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                                                         ${!selectedGroup.selected ? 'opacity-40 cursor-not-allowed' : 'hover:border-white/20'}
                                                     `}
                                                 >
-                                                    {selectedGroup.category === '3D' && (
-                                                        <optgroup label="Solid Definition">
-                                                            {MODEL_OPTIONS['3D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-                                                        </optgroup>
-                                                    )}
-                                                    {selectedGroup.category === '2D' && (
-                                                        <optgroup label="Shell Definition">
-                                                            {MODEL_OPTIONS['2D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-                                                        </optgroup>
-                                                    )}
-                                                    {selectedGroup.category === '1D' && (
-                                                        <optgroup label="Beam Definition">
-                                                            {MODEL_OPTIONS['1D'].map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-                                                        </optgroup>
-                                                    )}
+                                                    {(() => {
+                                                        const availableModels = getFilteredModelOptionsByElementType(
+                                                            selectedGroup.phenomenon as PhysicsApplication, 
+                                                            selectedGroup.medType || '',
+                                                            selectedGroup.category
+                                                        )
+                                                        return availableModels.length > 0 && (
+                                                            <optgroup label={`${selectedGroup.phenomenon} ${selectedGroup.medType || selectedGroup.category} Models`}>
+                                                                {availableModels.map(op => (
+                                                                    <option key={op.value} value={op.value}>{op.label}</option>
+                                                                ))}
+                                                            </optgroup>
+                                                        )
+                                                    })()}
                                                 </select>
                                                 <div className="absolute right-4 top-[84px] pointer-events-none text-slate-500">
                                                     <ChevronRight size={14} className="rotate-90" />
@@ -417,8 +582,15 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                                                 <div className="flex items-start gap-3 mt-4 p-3 rounded-lg bg-cyan-900/10 border border-cyan-500/10">
                                                     <Activity className="w-4 h-4 text-cyan-500 shrink-0 mt-0.5" />
                                                     <div>
-                                                        <p className="text-[10px] font-bold text-cyan-200">Mechanical Solver Active</p>
-                                                        <p className="text-[9px] text-cyan-500/70 mt-0.5">Linear Elasticity applied to {selectedGroup.count} elements.</p>
+                                                        <p className="text-[10px] font-bold text-cyan-200">
+                                                            {selectedGroup.phenomenon === 'MECANIQUE' ? 'Mechanical' : 
+                                                             selectedGroup.phenomenon === 'THERMIQUE' ? 'Thermal' : 'Acoustic'} Solver Active
+                                                        </p>
+                                                        <p className="text-[9px] text-cyan-500/70 mt-0.5">
+                                                            {selectedGroup.phenomenon === 'MECANIQUE' ? 'Linear Elasticity' :
+                                                             selectedGroup.phenomenon === 'THERMIQUE' ? 'Heat Transfer' : 'Wave Propagation'} 
+                                                            applied to {selectedGroup.count} elements.
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>

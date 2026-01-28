@@ -3,51 +3,34 @@
         {
             "group": "I300x200x10x10",
             "_meshFile": "beam.med",
-            "type": "POU_D_T",
+            "type": "POU_D_E",
             "phenomenon": "MECANIQUE",
-            "_category": "1D"
-        },
-        {
-            "group": "_FULL_MESH_",
-            "_meshFile": "beam.med",
-            "type": "POU_D_T",
-            "phenomenon": "MECANIQUE",
-            "_category": "1D"
+            "_category": "1D",
+            "section_type": "BEAM"
         },
         {
             "group": "Group_Of_All_Faces",
             "_meshFile": "shell.med",
             "type": "COQUE_3D",
             "phenomenon": "MECANIQUE",
-            "_category": "2D"
-        },
-        {
-            "group": "_FULL_MESH_",
-            "_meshFile": "shell.med",
-            "type": "COQUE_3D",
-            "phenomenon": "MECANIQUE",
-            "_category": "2D"
+            "_category": "2D",
+            "section_type": "SHELL"
         },
         {
             "group": "group_shell",
             "_meshFile": "shell.med",
-            "type": "COQUE_3D",
-            "phenomenon": "MECANIQUE",
-            "_category": "2D"
-        },
-        {
-            "group": "_FULL_MESH_",
-            "_meshFile": "solid.med",
-            "type": "3D",
-            "phenomenon": "MECANIQUE",
-            "_category": "3D"
+            "type": "AXIS",
+            "phenomenon": "THERMIQUE",
+            "_category": "2D",
+            "section_type": "SHELL"
         },
         {
             "group": "solid",
             "_meshFile": "solid.med",
             "type": "3D",
-            "phenomenon": "MECANIQUE",
-            "_category": "3D"
+            "phenomenon": "THERMIQUE",
+            "_category": "3D",
+            "section_type": "SOLID"
         }
     ],
     "materials": [],

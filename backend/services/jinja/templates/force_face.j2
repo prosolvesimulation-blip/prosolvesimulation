@@ -1,0 +1,23 @@
+{% for item in items %}
+{{ item.result_name }} = AFFE_CHAR_MECA(
+    MODELE={{ item.modele }},
+    FORCE_FACE=(
+        _F(
+            GROUP_MA='{{ item.group_ma }}',
+            {%- if item.FX is defined %}
+            FX={{ item.FX }},
+            {%- endif %}
+            {%- if item.FY is defined %}
+            FY={{ item.FY }},
+            {%- endif %}
+            {%- if item.FZ is defined %}
+            FZ={{ item.FZ }},
+            {%- endif %}
+        ),
+    ),
+    DOUBLE_LAGRANGE='{{ item.double_lagrange|default("NON") }}',
+    INFO={{ item.info|default(1) }},
+    VERI_NORM='{{ item.veri_norm|default("NON") }}',
+    VERI_AFFE='{{ item.veri_affe|default("NON") }}',
+);
+{% endfor %}

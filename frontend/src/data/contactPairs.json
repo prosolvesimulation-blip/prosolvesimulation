@@ -1,0 +1,196 @@
+{
+  "contact_pairs": {
+    "description": "Unified interaction library. Keys follow canonical sorting (LowerDim_HigherDim).",
+    
+    "1D_2D": [
+      {
+        "label": "Bonded (Beam to Shell Edge)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_ELEM",
+        "description": "Kinematic glue between a beam node and a shell edge.",
+        "parameters": {
+          "OPTION": "COQ_POU",
+          "GROUP_MA_1": "${shell_edge_group}",
+          "GROUP_NO_2": "${beam_node_group}",
+          "CARA_ELEM": "${element_properties}"
+        }
+      },
+      {
+        "label": "Bonded (Beam to 2D Continuum)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_ELEM",
+        "description": "Kinematic glue between a beam node and a 2D continuum edge.",
+        "parameters": {
+          "OPTION": "2D_POU",
+          "GROUP_MA_1": "${2d_edge_group}",
+          "GROUP_NO_2": "${beam_node_group}"
+        }
+      }
+    ],
+
+    "1D_3D": [
+      {
+        "label": "Bonded (Beam to Solid Face)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_ELEM",
+        "description": "Kinematic glue between a beam node and a solid face.",
+        "parameters": {
+          "OPTION": "3D_POU",
+          "GROUP_MA_1": "${solid_face_group}",
+          "GROUP_NO_2": "${beam_node_group}"
+        }
+      },
+      {
+        "label": "Bonded (Pipe to Solid Face)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_ELEM",
+        "description": "Kinematic glue between a pipe node and a solid face.",
+        "parameters": {
+          "OPTION": "3D_TUYAU",
+          "GROUP_MA_1": "${solid_face_group}",
+          "GROUP_NO_2": "${pipe_node_group}",
+          "CARA_ELEM": "${pipe_properties}"
+        }
+      }
+    ],
+
+    "2D_2D": [
+      {
+        "label": "Bonded (Mesh Glue)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_MAIL",
+        "description": "Linear tie between two incongruent 2D meshes (e.g., Shell-Shell or Axisym-Axisym).",
+        "parameters": {
+          "TYPE_RACCORD": "MASSIF",
+          "GROUP_MA_MAIT": "${master_edge_group}",
+          "GROUP_MA_ESCL": "${slave_edge_group}"
+        }
+      },
+      {
+        "label": "Frictionless Contact (2D)",
+        "behavior": "Non-Linear",
+        "command": "DEFI_CONTACT",
+        "description": "Standard frictionless contact for 2D/Axisymmetric analysis.",
+        "parameters": {
+          "FORMULATION": "CONTINUE",
+          "FROTTEMENT": "SANS",
+          "ZONE": {
+            "GROUP_MA_MAIT": "${master_edge_group}",
+            "GROUP_MA_ESCL": "${slave_edge_group}",
+            "ALGO_CONT": "PENALISATION",
+            "E_N": "${normal_stiffness_value}"
+          }
+        }
+      },
+      {
+        "label": "Frictional Contact (2D)",
+        "behavior": "Non-Linear",
+        "command": "DEFI_CONTACT",
+        "description": "Coulomb friction contact for 2D/Axisymmetric analysis.",
+        "parameters": {
+          "FORMULATION": "CONTINUE",
+          "FROTTEMENT": "COULOMB",
+          "ZONE": {
+            "GROUP_MA_MAIT": "${master_edge_group}",
+            "GROUP_MA_ESCL": "${slave_edge_group}",
+            "ALGO_CONT": "PENALISATION",
+            "COULOMB": "${friction_coefficient}",
+            "E_N": "${normal_stiffness_value}",
+            "E_T": "${tangential_stiffness_value}"
+          }
+        }
+      }
+    ],
+
+    "2D_3D": [
+      {
+        "label": "Bonded (Shell Edge to Solid Face)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_MAIL",
+        "description": "Connects a Shell edge perpendicular to a Solid face.",
+        "parameters": {
+          "TYPE_RACCORD": "COQUE_MASSIF",
+          "GROUP_MA_MAIT": "${solid_face_group}",
+          "GROUP_MA_ESCL": "${shell_edge_group}",
+          "EPAIS": "${shell_thickness}",
+          "CHAM_NORMALE": "${normal_field}"
+        }
+      }
+    ],
+
+    "3D_3D": [
+      {
+        "label": "Bonded (Mesh Glue)",
+        "behavior": "Linear",
+        "command": "AFFE_CHAR_MECA",
+        "sub_command": "LIAISON_MAIL",
+        "description": "Linear tie between two incongruent 3D Solid meshes.",
+        "parameters": {
+          "TYPE_RACCORD": "MASSIF",
+          "GROUP_MA_MAIT": "${master_face_group}",
+          "GROUP_MA_ESCL": "${slave_face_group}"
+        }
+      },
+      {
+        "label": "Frictionless Contact",
+        "behavior": "Non-Linear",
+        "command": "DEFI_CONTACT",
+        "description": "Standard frictionless contact allowing separation.",
+        "parameters": {
+          "FORMULATION": "CONTINUE",
+          "FROTTEMENT": "SANS",
+          "LISSAGE": "OUI",
+          "ALGO_RESO_GEOM": "AUTOMATIQUE",
+          "ZONE": {
+            "GROUP_MA_MAIT": "${master_face_group}",
+            "GROUP_MA_ESCL": "${slave_face_group}",
+            "ALGO_CONT": "PENALISATION",
+            "E_N": "${normal_stiffness_value}"
+          }
+        }
+      },
+      {
+        "label": "Frictional Contact",
+        "behavior": "Non-Linear",
+        "command": "DEFI_CONTACT",
+        "description": "Contact with Coulomb friction.",
+        "parameters": {
+          "FORMULATION": "CONTINUE",
+          "FROTTEMENT": "COULOMB",
+          "LISSAGE": "OUI",
+          "ALGO_RESO_GEOM": "AUTOMATIQUE",
+          "ZONE": {
+            "GROUP_MA_MAIT": "${master_face_group}",
+            "GROUP_MA_ESCL": "${slave_face_group}",
+            "ALGO_CONT": "PENALISATION",
+            "COULOMB": "${friction_coefficient}",
+            "E_N": "${normal_stiffness_value}",
+            "E_T": "${tangential_stiffness_value}"
+          }
+        }
+      },
+      {
+        "label": "Small Sliding Contact (Tied/Glissière)",
+        "behavior": "Non-Linear",
+        "command": "DEFI_CONTACT",
+        "description": "Allows sliding but prevents separation (Glissière option). Useful for guides.",
+        "parameters": {
+          "FORMULATION": "DISCRETE",
+          "FROTTEMENT": "SANS",
+          "ZONE": {
+            "GROUP_MA_MAIT": "${master_face_group}",
+            "GROUP_MA_ESCL": "${slave_face_group}",
+            "ALGO_CONT": "CONTRAINTE",
+            "GLISSIERE": "OUI"
+          }
+        }
+      }
+    ]
+  }
+}

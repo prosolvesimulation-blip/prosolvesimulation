@@ -2,10 +2,12 @@ import os
 import sys
 import subprocess
 import json
+from functools import lru_cache  # Memory caching
 from flask import Blueprint, jsonify, request, current_app
 import webview
 from jinja2 import Environment, FileSystemLoader
 import threading
+from services.section_calculator import calculate_section_properties
 
 # from services.vtk_converter import call_med_extractor  # DELETED
 # from services.med.vtk_extruder import extrude_beam_memory, extrude_shell_memory  # Imported inside routes now
@@ -180,6 +182,11 @@ def med_env_run(script_name, file_path):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@lru_cache(maxsize=32)
+def med_env_run_cached(script_name, file_path, file_mtime):
+    """Cached version of med_env_run with file modification time for invalidation."""
+    return med_env_run(script_name, file_path)
+
 @api_blueprint.route('/open_folder_dialog', methods=['GET'])
 def open_folder_dialog():
     """Opens native Windows Folder Picker using PyWebView."""
@@ -214,14 +221,15 @@ def scan_workspace():
         mesh_cargo = {}
         for m_file in mesh_files:
             full_path = os.path.join(folder_path, m_file)
+            file_mtime = os.path.getmtime(full_path)
             print(f"[INGEST] Processing {m_file}...")
             
             # 1. DNA (extractor)
-            dna = med_env_run("med_extractor.py", full_path)
+            dna = med_env_run_cached("med_extractor.py", full_path, file_mtime)
             # 2. Types (inspecter)
-            inspection = med_env_run("med_inspecter.py", full_path)
+            inspection = med_env_run_cached("med_inspecter.py", full_path, file_mtime)
             # 3. Connection/VTK (mesher)
-            mesher = med_env_run("med_mesher.py", full_path)
+            mesher = med_env_run_cached("med_mesher.py", full_path, file_mtime)
             
             # Merge logic
             if dna.get("status") == "success":
@@ -520,12 +528,17 @@ def launch_tool():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@lru_cache(maxsize=1000)
+def calculate_section_cached(param_hash, section_type, params_tuple):
+    """Memory-cached section calculation."""
+    params = dict(params_tuple)
+    return calculate_section_properties(section_type, params)
+
 @api_blueprint.route('/calculate_section', methods=['POST'])
 def calculate_section():
-    """Calculate section properties using an external extractor and cache."""
+    """Calculate section properties using direct function calls and cache."""
     try:
         import hashlib
-        import subprocess
         
         data = request.get_json()
         section_type = data.get('type')
@@ -534,41 +547,13 @@ def calculate_section():
         if not section_type:
             return jsonify({"status": "error", "message": "Section type required"}), 400
             
-        # 1. CACHE MANAGEMENT
+        # 1. CACHE MANAGEMENT - Memory based
         param_str = json.dumps({"type": section_type, "params": params}, sort_keys=True)
         param_hash = hashlib.sha256(param_str.encode()).hexdigest()
         
-        cache_dir = os.path.join(BASE_DIR, ".cache", "sections")
-        os.makedirs(cache_dir, exist_ok=True)
-        cache_file = os.path.join(cache_dir, f"{param_hash}.json")
-        
-        if os.path.exists(cache_file):
-            with open(cache_file, "r", encoding="utf-8") as f:
-                return jsonify(json.load(f))
-        
-        # 2. DYNAMIC EXTRACTION
-        extractor_path = os.path.join(BASE_DIR, "services", "section_extractor.py")
-        
-        result = subprocess.run(
-            [sys.executable, extractor_path],
-            input=json.dumps(data),
-            capture_output=True,
-            text=True,
-            encoding='utf-8'
-        )
-        
-        if result.returncode != 0:
-            return jsonify({"status": "error", "message": f"Extractor failed: {result.stderr}"}), 500
-            
-        try:
-            output_json = json.loads(result.stdout)
-        except:
-            return jsonify({"status": "error", "message": f"Invalid extractor output: {result.stdout}"}), 500
-            
-        # 3. SAVE TO CACHE
-        if output_json.get("status") == "success":
-            with open(cache_file, "w", encoding="utf-8") as f:
-                json.dump(output_json, f)
+        # 2. MEMORY CACHE LOOKUP
+        params_tuple = tuple(sorted(params.items()))
+        output_json = calculate_section_cached(param_hash, section_type, params_tuple)
                 
         return jsonify(output_json)
         

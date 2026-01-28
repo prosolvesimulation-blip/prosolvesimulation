@@ -64,6 +64,17 @@ def load_json(path, key=None):
     except Exception:
         return [] if key else {}
 
+if args.project_path:
+    # Modo Produção: Usa a pasta simulation_files do projeto
+    PROJECT_DIR = Path(args.project_path)
+    SIM_DIR = PROJECT_DIR / "simulation_files"
+    STUDY_DIR = SIM_DIR
+    OUTPUT_DIR = SIM_DIR
+else:
+    # Modo Teste: Sem project_path - não faz nada
+    print("No project_path provided - running in test mode")
+    sys.exit(0)
+
 # A. Unified Project Config
 project_file = PROJECT_DIR / "project.json"
 project_config = load_json(project_file)
@@ -127,8 +138,8 @@ asse_data = build_asse_maillage(mesh_names, result_name=FINAL_MESH)
 
 # B & E. Geometry (Model + Properties)
 geom_data = build_geometry(geometry_list, model_name=FINAL_MODEL, result_name=FINAL_CARA)
-model_data = { "result_name": FINAL_MODEL, "mesh_name": FINAL_MESH, "items": geom_data["model_items"] }
-for item in model_data["items"]: item["phenomene"] = "MECANIQUE"
+# Use affe_modele builder with physics data from geometries
+model_data = build_affe_modele(geometry_list, mesh_name=FINAL_MESH, result_name=FINAL_MODEL)
 
 # C & D. Materials
 defi_mat_data = build_defi_materiau(mat_props_list)
