@@ -44,6 +44,7 @@ interface RestrictionConfigProps {
     availableGroups?: any[] 
     initialRestrictions?: any[] 
     onUpdate?: (data: any) => void
+    onRestrictionCommandsUpdate?: (commands: any) => void
 }
 
 interface KinematicConstraint {
@@ -109,7 +110,8 @@ export default function RestrictionConfig({
     projectPath,
     availableGroups = [],
     initialRestrictions = [],
-    onUpdate
+    onUpdate,
+    onRestrictionCommandsUpdate
 }: RestrictionConfigProps) {
     
     const [constraints, setConstraints] = useState<KinematicConstraint[]>(initialRestrictions)
@@ -255,6 +257,86 @@ export default function RestrictionConfig({
     useEffect(() => {
         if(onUpdate) onUpdate(constraints);
     }, [constraints, onUpdate]);
+    
+    // Generate and update restriction commands
+    useEffect(() => {
+        if (onRestrictionCommandsUpdate) {
+            const ddlCommands = constraints
+                .filter(c => c.type === 'DDL_IMPO')
+                .map(c => {
+                    const args: string[] = []
+                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
+                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
+                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
+                    
+                    if (physicsCheck.rotAllowed) {
+                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
+                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
+                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
+                    }
+                    
+                    return `${c.name} = DDL_IMPO(
+    GROUP_MA = '${c.targetGroup}',
+    ${args.join(',\n    ')}
+);`
+                })
+            
+            const faceCommands = constraints
+                .filter(c => c.type === 'FACE_IMPO')
+                .map(c => {
+                    const args: string[] = []
+                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
+                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
+                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
+                    
+                    if (physicsCheck.rotAllowed) {
+                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
+                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
+                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
+                    }
+                    
+                    if (c.dnor) args.push(`DNOR=${c.values['DNOR'] || 0}`)
+                    
+                    return `${c.name} = FACE_IMPO(
+    GROUP_MA = '${c.targetGroup}',
+    ${args.join(',\n    ')}
+);`
+                })
+            
+            const edgeCommands = constraints
+                .filter(c => c.type === 'ARETE_IMPO')
+                .map(c => {
+                    const args: string[] = []
+                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
+                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
+                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
+                    
+                    if (physicsCheck.rotAllowed) {
+                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
+                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
+                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
+                    }
+                    
+                    if (c.dtan) args.push(`DTAN=${c.values['DTAN'] || 0}`)
+                    
+                    return `${c.name} = ARETE_IMPO(
+    GROUP_MA = '${c.targetGroup}',
+    ${args.join(',\n    ')}
+);`
+                })
+            
+            onRestrictionCommandsUpdate({
+                ddlCommands,
+                faceCommands,
+                edgeCommands,
+                validation: {
+                    isValid: true,
+                    errors: [],
+                    warnings: []
+                }
+            })
+        }
+    }, [constraints, onRestrictionCommandsUpdate, physicsCheck])
 
     // --- Actions ---
 

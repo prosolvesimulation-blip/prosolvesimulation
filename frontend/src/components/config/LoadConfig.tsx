@@ -12,24 +12,30 @@ import {
     AlertCircle,
     AlertTriangle,
     Info,
-    Sliders
+    Sliders,
+    ArrowRight
 } from 'lucide-react'
 import { codeAsterIntelligence, type LoadParameters, type ValidationResult } from '../../lib/codeAsterIntelligence'
 
 interface Load {
     id: string
     name: string
-    type: 'gravity' | 'force' | 'pressure' | 'face_force'
+    type: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force'
     group?: string
     applyToWholeModel?: boolean
     fx?: string
     fy?: string
     fz?: string
+    mx?: string
+    my?: string
+    mz?: string
     pressure?: string
     ax?: string
     ay?: string
     az?: string
     intensity?: string
+    fnorm?: string
+    ftan?: string
     optionalParams?: Record<string, any>
 }
 
@@ -39,19 +45,21 @@ interface LoadConfigProps {
     meshGroups?: any
     initialLoads?: any[]
     onUpdate?: (loads: any[]) => void
+    onLoadCommandsUpdate?: (commands: any) => void
 }
 
 const LOAD_VARIANTS = {
     'gravity': { label: 'Grav_Acceleration', icon: Globe, color: 'text-orange-500', btn: 'bg-orange-600', unit: 'm/s²' },
     'force': { label: 'Nodal_Force', icon: Zap, color: 'text-emerald-500', btn: 'bg-emerald-600', unit: 'N' },
     'pressure': { label: 'Surface_Pressure', icon: Waves, color: 'text-cyan-500', btn: 'bg-cyan-600', unit: 'Pa' },
-    'face_force': { label: 'Face_Force', icon: TrendingUp, color: 'text-purple-500', btn: 'bg-purple-600', unit: 'N/m²' }
+    'face_force': { label: 'Face_Force', icon: TrendingUp, color: 'text-purple-500', btn: 'bg-purple-600', unit: 'N/m²' },
+    'edge_force': { label: 'Edge_Force', icon: ArrowRight, color: 'text-amber-500', btn: 'bg-amber-600', unit: 'N/m' }
 }
 
 // --- Advanced Parameters Component ---
 
 interface AdvancedParamsProps {
-    loadType: 'gravity' | 'force' | 'pressure' | 'face_force'
+    loadType: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force'
     params: Record<string, any>
     onChange: (key: string, value: any) => void
 }
@@ -64,7 +72,8 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
         'gravity': 'PESANTEUR',
         'force': 'FORCE_NODALE',
         'pressure': 'PRES_REP',
-        'face_force': 'FORCE_FACE'
+        'face_force': 'FORCE_FACE',
+        'edge_force': 'FORCE_ARETE'
     } as const
     
     const asterLoadType = loadTypeMap[loadType] as any
@@ -202,7 +211,8 @@ export default function LoadConfig({
     availableGroups = [],
     meshGroups,
     initialLoads = [],
-    onUpdate
+    onUpdate,
+    onLoadCommandsUpdate
 }: LoadConfigProps) {
     const [loads, setLoads] = useState<Load[]>([])
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
@@ -267,7 +277,7 @@ export default function LoadConfig({
     }
 
     // Filter groups based on load type
-    const getFilteredGroups = (loadType: 'gravity' | 'force' | 'pressure' | 'face_force'): string[] => {
+    const getFilteredGroups = (loadType: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force'): string[] => {
         const filtered = availableGroups.filter(groupName => {
             // Exclude _FULL_MESH (various formats)
             if (groupName === '_FULL_MESH' || groupName === '_FULL_MESH_' || groupName.includes('FULL_MESH')) {
@@ -292,6 +302,13 @@ export default function LoadConfig({
                 return isValid
             }
             
+            // For edge force loads: only edge groups (1D)
+            if (loadType === 'edge_force') {
+                const isValid = category === '1D'
+                console.log(`Edge force load: ${groupName} (${category}) -> ${isValid ? 'INCLUDED' : 'EXCLUDED'}`)
+                return isValid
+            }
+            
             // For gravity loads: all groups except _FULL_MESH (already filtered above)
             console.log(`Gravity load: ${groupName} (${category}) -> INCLUDED`)
             return true
@@ -305,17 +322,19 @@ export default function LoadConfig({
     useEffect(() => {
         if (initialLoads.length > 0 && loads.length === 0) {
             const formatted = initialLoads.map((l, index) => {
-                let type: 'gravity' | 'force' | 'pressure' | 'face_force' = 'force'
+                let type: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force' = 'force'
                 if (l.type === 'PESANTEUR') type = 'gravity'
                 else if (l.type === 'PRESSION') type = 'pressure'
                 else if (l.type === 'FORCE_FACE') type = 'face_force'
+                else if (l.type === 'FORCE_ARETE') type = 'edge_force'
 
                 // Initialize default optional parameters for existing loads
                 const loadTypeMap = {
                     'gravity': 'PESANTEUR',
                     'force': 'FORCE_NODALE',
                     'pressure': 'PRES_REP',
-                    'face_force': 'FORCE_FACE'
+                    'face_force': 'FORCE_FACE',
+                    'edge_force': 'FORCE_ARETE'
                 } as const
                 
                 const asterLoadType = loadTypeMap[type] as any
@@ -352,11 +371,17 @@ export default function LoadConfig({
                     fx: l.fx?.toString() || '0',
                     fy: l.fy?.toString() || '0',
                     fz: l.fz?.toString() || '0',
+                    mx: l.mx?.toString() || '0',
+                    my: l.my?.toString() || '0',
+                    mz: l.mz?.toString() || '0',
                     pressure: l.pressure?.toString() || '0',
                     ax: l.direction?.[0]?.toString() || '0',
                     ay: l.direction?.[1]?.toString() || '0',
                     az: l.direction?.[2]?.toString() || '-1',
                     intensity: l.gravite?.toString() || '9.81',
+                    fnorm: l.fnorm?.toString() || '0',
+                    ftan: l.ftan?.toString() || '0',
+                    useGlobalCoords: l.useGlobalCoords !== undefined ? l.useGlobalCoords : true,
                     optionalParams: defaultOptionalParams
                 }
             })
@@ -406,6 +431,18 @@ export default function LoadConfig({
                         fy: parseFloat(l.fy || '0'),
                         fz: parseFloat(l.fz || '0')
                     }
+                } else if (l.type === 'edge_force') {
+                    return {
+                        name: String(l.name || ''),
+                        type: 'FORCE_ARETE',
+                        group: String(l.group || ''),
+                        fx: parseFloat(l.fx || '0'),
+                        fy: parseFloat(l.fy || '0'),
+                        fz: parseFloat(l.fz || '0'),
+                        mx: parseFloat(l.mx || '0'),
+                        my: parseFloat(l.my || '0'),
+                        mz: parseFloat(l.mz || '0')
+                    }
                 } else {
                     return {
                         name: String(l.name || ''),
@@ -423,17 +460,75 @@ export default function LoadConfig({
             }
         }
     }, [loads, onUpdate])
+    
+    // Generate and update load commands
+    useEffect(() => {
+        if (onLoadCommandsUpdate) {
+            const forceCommands = loads
+                .filter(l => l.type === 'force')
+                .map(l => {
+                    const parameters = {
+                        FX: parseFloat(l.fx || '0'),
+                        FY: parseFloat(l.fy || '0'),
+                        FZ: parseFloat(l.fz || '0')
+                    }
+                    return codeAsterIntelligence.generateCommandSyntax(
+                        'FORCE_NODALE',
+                        parameters,
+                        l.group || '',
+                        undefined
+                    )
+                })
+            
+            const pressureCommands = loads
+                .filter(l => l.type === 'pressure')
+                .map(l => {
+                    const parameters = {
+                        PRES: parseFloat(l.intensity || '0')
+                    }
+                    return codeAsterIntelligence.generateCommandSyntax(
+                        'PRES_REP',
+                        parameters,
+                        l.group || '',
+                        undefined
+                    )
+                })
+            
+            const gravityCommands = loads
+                .filter(l => l.type === 'gravity')
+                .map(l => {
+                    const parameters = {
+                        GRAVITE: parseFloat(l.intensity || '9.81'),
+                        DIRECTION: [parseFloat(l.ax || '0'), parseFloat(l.ay || '0'), parseFloat(l.az || '-1')]
+                    }
+                    return codeAsterIntelligence.generateCommandSyntax(
+                        'PESANTEUR',
+                        parameters,
+                        '', // Gravity applies to whole model
+                        undefined
+                    )
+                })
+            
+            onLoadCommandsUpdate({
+                forceCommands,
+                pressureCommands,
+                gravityCommands,
+                totalLoadName: 'CHARGE_TOTAL'
+            })
+        }
+    }, [loads, onLoadCommandsUpdate])
 
-    const addItem = (type: 'gravity' | 'force' | 'pressure' | 'face_force') => {
+    const addItem = (type: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force') => {
         const newId = (loads.length + 1).toString()
-        const suffix = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'LOAD' : type === 'face_force' ? 'FACE' : 'PRESS'
+        const suffix = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'LOAD' : type === 'face_force' ? 'FACE' : type === 'edge_force' ? 'EDGE' : 'PRESS'
         
         // Get default optional parameters from Code_Aster intelligence
         const loadTypeMap = {
             'gravity': 'PESANTEUR',
             'force': 'FORCE_NODALE',
             'pressure': 'PRES_REP',
-            'face_force': 'FORCE_FACE'
+            'face_force': 'FORCE_FACE',
+            'edge_force': 'FORCE_ARETE'
         } as const
         
         const asterLoadType = loadTypeMap[type] as any
@@ -467,7 +562,8 @@ export default function LoadConfig({
             type,
             group: getFilteredGroups(type)[0] || '',
             applyToWholeModel: type === 'gravity', // Default to whole model for gravity loads
-            fx: '0', fy: '0', fz: '0', pressure: '0', ax: '0', ay: '0', az: '-1', intensity: '9.81',
+            fx: '0', fy: '0', fz: '0', mx: '0', my: '0', mz: '0', pressure: '0', ax: '0', ay: '0', az: '-1', intensity: '9.81',
+            fnorm: '0', ftan: '0',
             optionalParams: defaultOptionalParams
         }
         setLoads([...loads, newItem])
@@ -508,7 +604,8 @@ export default function LoadConfig({
             'gravity': 'PESANTEUR',
             'force': 'FORCE_NODALE',
             'pressure': 'PRES_REP',
-            'face_force': 'FORCE_FACE'
+            'face_force': 'FORCE_FACE',
+            'edge_force': 'FORCE_ARETE'
         } as const
         
         const asterLoadType = loadTypeMap[selected.type] as any
@@ -542,11 +639,24 @@ export default function LoadConfig({
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
+        } else if (selected.type === 'edge_force') {
+            const fx = parseFloat(selected.fx || '0')
+            const fy = parseFloat(selected.fy || '0')
+            const fz = parseFloat(selected.fz || '0')
+            const mx = parseFloat(selected.mx || '0')
+            const my = parseFloat(selected.my || '0')
+            const mz = parseFloat(selected.mz || '0')
+            
+            if (fx !== 0) parameters.FX = fx
+            if (fy !== 0) parameters.FY = fy
+            if (fz !== 0) parameters.FZ = fz
+            if (mx !== 0) parameters.MX = mx
+            if (my !== 0) parameters.MY = my
+            if (mz !== 0) parameters.MZ = mz
         }
         
         // Add optional parameters to the main parameters object
         const optionalParams = selected.optionalParams || {}
-        console.log('Optional params in generatedCode:', optionalParams)
         if (optionalParams.DOUBLE_LAGRANGE) {
             parameters.DOUBLE_LAGRANGE = optionalParams.DOUBLE_LAGRANGE
         }
@@ -559,8 +669,6 @@ export default function LoadConfig({
         if (optionalParams.VERI_AFFE) {
             parameters.VERI_AFFE = optionalParams.VERI_AFFE
         }
-        
-        console.log('Final parameters for generateCommandSyntax:', parameters)
         
         // Generate command using Code_Aster intelligence
         const result = codeAsterIntelligence.generateCommandSyntax(
@@ -575,7 +683,7 @@ export default function LoadConfig({
         }
         
         return result.command || '# Command generation failed'
-    }, [selected])
+    }, [selected, selected?.fx, selected?.fy, selected?.fz, selected?.mx, selected?.my, selected?.mz, selected?.fnorm, selected?.ftan])
 
     // Real-time validation using Code_Aster intelligence
     const validationResult = useMemo((): ValidationResult => {
@@ -586,7 +694,8 @@ export default function LoadConfig({
             'gravity': 'PESANTEUR',
             'force': 'FORCE_NODALE',
             'pressure': 'PRES_REP',
-            'face_force': 'FORCE_FACE'
+            'face_force': 'FORCE_FACE',
+            'edge_force': 'FORCE_ARETE'
         } as const
         
         const asterLoadType = loadTypeMap[selected.type] as any
@@ -620,6 +729,20 @@ export default function LoadConfig({
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
+        } else if (selected.type === 'edge_force') {
+            const fx = parseFloat(selected.fx || '0')
+            const fy = parseFloat(selected.fy || '0')
+            const fz = parseFloat(selected.fz || '0')
+            const mx = parseFloat(selected.mx || '0')
+            const my = parseFloat(selected.my || '0')
+            const mz = parseFloat(selected.mz || '0')
+            
+            if (fx !== 0) parameters.FX = fx
+            if (fy !== 0) parameters.FY = fy
+            if (fz !== 0) parameters.FZ = fz
+            if (mx !== 0) parameters.MX = mx
+            if (my !== 0) parameters.MY = my
+            if (mz !== 0) parameters.MZ = mz
         }
         
         return codeAsterIntelligence.validateLoadParameters(asterLoadType, parameters)
@@ -1079,6 +1202,104 @@ export default function LoadConfig({
                                             </div>
                                         </div>
                                     )}
+
+                                    {selected.type === 'edge_force' && (
+                                        <div className="flex gap-8">
+                                            {/* Input Region Column */}
+                                            <div className="flex-1">
+                                                {/* Force Components */}
+                                                <div>
+                                                    <div className="mb-6">
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Forces (N/m)</span>
+                                                        <div className="grid grid-cols-3 gap-6 mt-3">
+                                                            {(['fx', 'fy', 'fz'] as const).map(dir => (
+                                                                <VectorInput
+                                                                    key={dir}
+                                                                    label={`Force_${dir.slice(-1).toUpperCase()}`}
+                                                                    value={selected[dir]}
+                                                                    unit="N/m"
+                                                                    onChange={(v) => updateItem(selected.id, dir, v)}
+                                                                    theme="AMBER"
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="mb-6">
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Moments (N·m/m)</span>
+                                                        <div className="grid grid-cols-3 gap-6 mt-3">
+                                                            {(['mx', 'my', 'mz'] as const).map(dir => (
+                                                                <VectorInput
+                                                                    key={dir}
+                                                                    label={`Moment_${dir.slice(-1).toUpperCase()}`}
+                                                                    value={selected[dir]}
+                                                                    unit="N·m/m"
+                                                                    onChange={(v) => updateItem(selected.id, dir, v)}
+                                                                    theme="AMBER"
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Advanced Parameters */}
+                                                <AdvancedParams
+                                                    loadType={selected.type}
+                                                    params={selected.optionalParams || {}}
+                                                    onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
+                                                />
+                                                
+                                                {/* Aster Command Preview */}
+                                                <div className="border-t border-slate-800 mt-8">
+                                                    <button 
+                                                        onClick={() => setIsCodeOpen(!isCodeOpen)}
+                                                        className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-2 text-slate-400">
+                                                            <FileCode2 className="w-4 h-4" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Aster Command Preview</span>
+                                                        </div>
+                                                        {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                                                    </button>
+                                                    
+                                                    {isCodeOpen && (
+                                                        <div className="relative group">
+                                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button 
+                                                                    onClick={() => navigator.clipboard.writeText(generatedCode)}
+                                                                    className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
+                                                                >
+                                                                    <Copy className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                            <pre className="p-4 bg-slate-900 rounded-b border-x border-b border-slate-800 font-mono text-xs text-emerald-300 leading-relaxed overflow-x-auto">
+                                                                {generatedCode}
+                                                            </pre>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Groups Sidebar Column */}
+                                            <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
+                                                <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Target_Edge_Group</span>
+                                                <div className="space-y-1">
+                                                    {getFilteredGroups('edge_force').map(g => (
+                                                        <button
+                                                            key={g}
+                                                            onClick={() => updateItem(selected.id, 'group', g)}
+                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
+                                                                selected.group === g
+                                                                    ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                            }`}
+                                                        >
+                                                            {g}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </section>
 
 
@@ -1146,9 +1367,9 @@ export default function LoadConfig({
     )
 }
 
-function VectorInput({ label, value, unit, onChange, theme, fullWidth }: { label: string, value: any, unit: string, onChange: (v: string) => void, theme?: 'EMERALD' | 'ORANGE' | 'CYAN' | 'PURPLE', fullWidth?: boolean }) {
-    const colorClass = theme === 'ORANGE' ? 'text-orange-500' : theme === 'CYAN' ? 'text-cyan-400' : theme === 'PURPLE' ? 'text-purple-400' : 'text-emerald-400'
-    const borderClass = theme === 'ORANGE' ? 'border-orange-500/30' : theme === 'CYAN' ? 'border-cyan-500/30' : theme === 'PURPLE' ? 'border-purple-500/30' : 'border-emerald-500/30'
+function VectorInput({ label, value, unit, onChange, theme, fullWidth }: { label: string, value: any, unit: string, onChange: (v: string) => void, theme?: 'EMERALD' | 'ORANGE' | 'CYAN' | 'PURPLE' | 'AMBER', fullWidth?: boolean }) {
+    const colorClass = theme === 'ORANGE' ? 'text-orange-500' : theme === 'CYAN' ? 'text-cyan-400' : theme === 'PURPLE' ? 'text-purple-400' : theme === 'AMBER' ? 'text-amber-400' : 'text-emerald-400'
+    const borderClass = theme === 'ORANGE' ? 'border-orange-500/30' : theme === 'CYAN' ? 'border-cyan-500/30' : theme === 'PURPLE' ? 'border-purple-500/30' : theme === 'AMBER' ? 'border-amber-500/30' : 'border-emerald-500/30'
 
     return (
         <div className={`group relative bg-slate-950/50 border border-slate-800 p-3 transition-all hover:bg-slate-900 ${fullWidth ? 'w-full' : ''}`}>

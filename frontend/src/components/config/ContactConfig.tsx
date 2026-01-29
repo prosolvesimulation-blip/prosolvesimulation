@@ -5,8 +5,10 @@ import {
     CheckCircle, Search, Layers, 
     Settings, Brain, AlertCircle, X, ChevronDown,
     Info, Sliders, Box, Square, Activity, CircleDot,
-    Lock, RefreshCw, Anchor
+    Lock, RefreshCw, Anchor, FileCode2, Copy, ChevronUp,
+    AlertTriangle
 } from 'lucide-react'
+import { contactIntelligence, createContactDefinition } from '../../lib/codeAster/builders/contactIntelligence'
 
 // --- TYPES & INTERFACES ---
 
@@ -22,9 +24,15 @@ interface ContactItem {
     name: string;
     master: string | null;
     slave: string | null;
-    type: 'COLLAGE' | 'GLISSEMENT' | 'FROTTEMENT';
+    type: 'COLLAGE' | 'GLISSEMENT' | 'FROTTEMENT' | 'LIAISON_DDL' | 'LIAISON_MAIL' | 'LIAISON_GROUP' | 'LIAISON_SOLIDE' | 'LIAISON_ELEM';
     params: Record<string, any>;
     isValid: boolean;
+}
+
+interface ValidationResult {
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
 }
 
 type ParameterDef = {
@@ -37,6 +45,55 @@ type ParameterDef = {
     description: string;
     unit?: string;
 };
+
+// --- VALIDATION FUNCTION ---
+
+/**
+ * Validates contact configuration
+ */
+function validateContactConfiguration(contact: ContactItem): ValidationResult {
+    const errors: string[] = []
+    const warnings: string[] = []
+    
+    // Check required fields
+    if (!contact.master) {
+        errors.push('Master group is required')
+    }
+    
+    if (!contact.slave) {
+        errors.push('Slave group is required')
+    }
+    
+    if (contact.master === contact.slave) {
+        errors.push('Master and slave groups must be different')
+    }
+    
+    // Validate contact type
+    if (!['COLLAGE', 'GLISSEMENT', 'FROTTEMENT'].includes(contact.type)) {
+        errors.push('Invalid contact type')
+    }
+    
+    // Type-specific validation
+    if (contact.type === 'FROTTEMENT') {
+        const friction = contact.params?.COULOMB
+        if (friction !== undefined && (friction < 0 || friction > 1)) {
+            warnings.push('Friction coefficient should be between 0 and 1')
+        }
+    }
+    
+    if (contact.type === 'COLLAGE') {
+        const distance = contact.params?.DISTANCE_MAX
+        if (distance !== undefined && distance < 0) {
+            warnings.push('Maximum projection distance should be positive')
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors,
+        warnings
+    }
+}
 
 // --- DEFINIÇÕES DE PARÂMETROS ---
 const CONTACT_LOGIC: Record<string, ParameterDef[]> = {
@@ -123,7 +180,12 @@ const CONTACT_LOGIC: Record<string, ParameterDef[]> = {
 const CONTACT_TYPES = [
     { id: 'COLLAGE', label: 'Bonded', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-500/30' },
     { id: 'GLISSEMENT', label: 'Sliding', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-500/30' },
-    { id: 'FROTTEMENT', label: 'Friction', color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-500/30' }
+    { id: 'FROTTEMENT', label: 'Friction', color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-500/30' },
+    { id: 'LIAISON_DDL', label: 'DOF Relations', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-500/30' },
+    { id: 'LIAISON_MAIL', label: 'Mesh Relations', color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-500/30' },
+    { id: 'LIAISON_GROUP', label: 'Group Relations', color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-500/30' },
+    { id: 'LIAISON_SOLIDE', label: 'Rigid Body', color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-500/30' },
+    { id: 'LIAISON_ELEM', label: 'Element Relations', color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-500/30' }
 ] as const;
 
 // --- SUB-COMPONENT: GROUP SELECTOR ---
@@ -486,6 +548,7 @@ interface ContactCardProps {
 
 const ContactCard: React.FC<ContactCardProps> = ({ contact, availableGroups, groupDimensions, onUpdate, onRemove }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [isCodeOpen, setIsCodeOpen] = useState(true);
     const isComplete = contact.master && contact.slave && contact.type;
 
     // Detect if Slave is likely a Node/0D group to enable Guard Rails
@@ -500,7 +563,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, availableGroups, gro
         onUpdate(contact.id, 'params', newParams);
     };
 
-    const handleTypeChange = (newType: 'COLLAGE' | 'GLISSEMENT' | 'FROTTEMENT') => {
+    const handleTypeChange = (newType: 'COLLAGE' | 'GLISSEMENT' | 'FROTTEMENT' | 'LIAISON_DDL' | 'LIAISON_MAIL' | 'LIAISON_GROUP' | 'LIAISON_SOLIDE' | 'LIAISON_ELEM') => {
         const defaults: Record<string, any> = {};
         CONTACT_LOGIC[newType]?.forEach(def => {
             defaults[def.asterKeyword] = def.default;
@@ -515,6 +578,45 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, availableGroups, gro
 
         onUpdate(contact.id, 'type', newType);
         onUpdate(contact.id, 'params', defaults);
+    };
+
+    // Code_Aster command generation using new intelligence
+    const generatedCode = useMemo(() => {
+        if (!contact.master || !contact.slave) {
+            return `// Error: Master and slave groups must be selected`;
+        }
+
+        // Create contact definition from current configuration
+        const contactDef = createContactDefinition(
+            contact.name,
+            contact.master,
+            contact.slave,
+            contact.type as any,
+            contact.params
+        );
+
+        // Generate command using intelligence
+        const result = contactIntelligence.generateContactCommand(contactDef);
+        
+        if (!result.validation.isValid) {
+            return `// Error: ${result.validation.errors.join(', ')}`;
+        }
+        
+        return result.command;
+    }, [contact]);
+
+    // Real-time validation
+    const validationResult = useMemo(() => {
+        return validateContactConfiguration(contact);
+    }, [contact]);
+
+    // Copy to clipboard function
+    const copyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(generatedCode);
+        } catch (err) {
+            console.error('Failed to copy command:', err);
+        }
     };
 
     return (
@@ -704,6 +806,69 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, availableGroups, gro
                                         )}
                                     </AnimatePresence>
                                 </div>
+                            </div>
+
+                            {/* CODE_ASTER COMMAND PREVIEW */}
+                            <div className="border-t border-slate-800/50 mt-6 pt-6">
+                                <button 
+                                    onClick={() => setIsCodeOpen(!isCodeOpen)}
+                                    className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2 text-slate-400">
+                                        <FileCode2 className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Aster Command Preview</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {/* Validation Status Indicator */}
+                                        <div className={`w-2 h-2 rounded-full ${validationResult.isValid ? 'bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(248,113,113,0.5)]'}`} />
+                                        <ChevronUp className={`w-4 h-4 text-slate-600 transition-transform ${isCodeOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </button>
+                                
+                                {isCodeOpen && (
+                                    <div className="mt-4 space-y-4">
+                                        {/* Validation Errors/Warnings */}
+                                        {!validationResult.isValid && (
+                                            <div className="flex items-start gap-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded text-rose-200">
+                                                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <div className="text-xs">
+                                                    <strong className="block uppercase mb-1">Validation Errors</strong>
+                                                    {validationResult.errors.map((error, idx) => (
+                                                        <div key={idx} className="mb-1">• {error}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {validationResult.warnings.length > 0 && (
+                                            <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded text-amber-200">
+                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <div className="text-xs">
+                                                    <strong className="block uppercase mb-1">Warnings</strong>
+                                                    {validationResult.warnings.map((warning, idx) => (
+                                                        <div key={idx} className="mb-1">• {warning}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Code Preview */}
+                                        <div className="relative">
+                                            <div className="absolute right-2 top-2 flex gap-2">
+                                                <button
+                                                    onClick={copyToClipboard}
+                                                    className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-400 hover:text-white transition-all"
+                                                    title="Copy to clipboard"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <pre className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs text-cyan-400 font-mono overflow-x-auto">
+                                                <code>{generatedCode}</code>
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </motion.div>

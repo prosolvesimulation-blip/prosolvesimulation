@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ArrowLeft, FolderOpen, Save, Play, Box, Grid } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ModelConfig from './config/ModelConfig'
@@ -16,6 +16,8 @@ import ContactConfig from './config/ContactConfig'
 import ConnectionConfig from './config/ConnectionsConfig'
 import VerificationConfig from './config/VerificationConfig'
 import SummaryConfig from './config/SummaryConfig'
+import SimulationExecution from './config/SimulationExecution'
+import { modelIntelligence } from '../lib/codeAster/builders/affeModele'
 
 interface StructuralWorkspaceProps {
     onBack: () => void
@@ -23,7 +25,7 @@ interface StructuralWorkspaceProps {
     setProjectPath: (path: string | null) => void
 }
 
-type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report' | 'summary'
+type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report' | 'summary' | 'simulation'
 
 interface ProjectConfig {
     geometries: any[]
@@ -36,6 +38,12 @@ interface ProjectConfig {
     connections?: any[]
     post_elem_mass?: any
     post_releve_t_reactions?: any
+    geometry_commands?: any
+    mesh_commands?: any
+    model_commands?: any
+    material_commands?: any
+    load_commands?: any
+    restriction_commands?: any
 }
 
 export default function StructuralWorkspace({
@@ -55,7 +63,13 @@ export default function StructuralWorkspace({
         contacts: [],
         connections: [],
         post_elem_mass: { mass_calculations: [] },
-        post_releve_t_reactions: { reaction_extraction: { enabled: true } }
+        post_releve_t_reactions: { reaction_cases: [] },
+        geometry_commands: { modeleCommands: [], caraCommands: [], validation: { isValid: false }, summary: {} },
+        mesh_commands: { lireCommands: [], asseCommands: [], validation: { isValid: false }, finalMeshName: '' },
+        model_commands: { commPreview: '', caraCommands: [] },
+        material_commands: { defiCommands: [], affeCommands: [], validation: { isValid: false } },
+        load_commands: { forceCommands: [], pressureCommands: [], gravityCommands: [], totalLoadName: 'CHARGE_TOTAL' },
+        restriction_commands: { ddlCommands: [], faceCommands: [], edgeCommands: [], validation: { isValid: false } }
     })
 
     // DEBUG LOG
@@ -65,6 +79,31 @@ export default function StructuralWorkspace({
     const [meshFiles, setMeshFiles] = useState<string[]>([])
     const [simulationRunning, setSimulationRunning] = useState(false)
     const [vtkGeometries, setVtkGeometries] = useState<any[]>([])
+
+    const globalModelCommands = useMemo(() => {
+        const exportData: Array<{ group: string; type: string; phenomenon: string }> = []
+
+        Object.entries(allGroupsData || {}).forEach(([_, groups]) => {
+            Object.keys(groups || {}).forEach(groupName => {
+                exportData.push({
+                    group: groupName,
+                    type: '3D',
+                    phenomenon: 'MECANIQUE'
+                })
+            })
+        })
+
+        const commPreview = modelIntelligence.generateCommPreview(exportData, 'MAIL', 'MODELE')
+
+        return {
+            modeleCommands: commPreview ? [commPreview] : [],
+            caraCommands: []
+        }
+    }, [allGroupsData])
+
+    useEffect(() => {
+        setProjectConfig(prev => ({ ...prev, model_commands: globalModelCommands }))
+    }, [globalModelCommands])
 
     // --- REDUNDANT: Removed to prevent overwriting of Unified Mesh Cargo (DNA + Inspeção) ---
     /*
@@ -176,6 +215,39 @@ export default function StructuralWorkspace({
                 geometries: [...preserved, ...updatedGeos]
             }
         })
+    }, [])
+
+    const updateGeometryCommands = useCallback((geometryCommands: any) => {
+        setProjectConfig(prev => ({ ...prev, geometry_commands: geometryCommands }))
+    }, [])
+
+    const updateModelCommands = useCallback((modelCommands: any) => {
+        console.log('StructuralWorkspace - Received data:', modelCommands)
+        setProjectConfig(prev => ({ ...prev, model_commands: modelCommands }))
+    }, [])
+
+    const updateMeshCommands = useCallback((meshCommands: any) => {
+        console.log('📨 StructuralWorkspace - updateMeshCommands called:')
+        console.log('   meshCommands:', meshCommands)
+        setProjectConfig(prev => ({ ...prev, mesh_commands: meshCommands }))
+    }, [])
+
+    const updateMaterialCommands = useCallback((materialCommands: any) => {
+        console.log('📨 StructuralWorkspace - updateMaterialCommands called:')
+        console.log('   materialCommands:', materialCommands)
+        setProjectConfig(prev => ({ ...prev, material_commands: materialCommands }))
+    }, [])
+
+    const updateLoadCommands = useCallback((loadCommands: any) => {
+        console.log('📨 StructuralWorkspace - updateLoadCommands called:')
+        console.log('   loadCommands:', loadCommands)
+        setProjectConfig(prev => ({ ...prev, load_commands: loadCommands }))
+    }, [])
+
+    const updateRestrictionCommands = useCallback((restrictionCommands: any) => {
+        console.log('📨 StructuralWorkspace - updateRestrictionCommands called:')
+        console.log('   restrictionCommands:', restrictionCommands)
+        setProjectConfig(prev => ({ ...prev, restriction_commands: restrictionCommands }))
     }, [])
 
     const updateMaterials = useCallback((materials: any[]) => {
@@ -342,7 +414,8 @@ export default function StructuralWorkspace({
         { id: 'verification' as Tab, label: 'Verification', icon: '⚖️' },
         { id: 'results' as Tab, label: 'Results', icon: '📈' },
         { id: 'report' as Tab, label: 'Report', icon: '📝' },
-        { id: 'summary' as Tab, label: 'Summary', icon: '📋' }
+        { id: 'summary' as Tab, label: 'Summary', icon: '📋' },
+        { id: 'simulation' as Tab, label: 'Simulation', icon: '🚀' }
     ]
 
     return (
@@ -487,6 +560,7 @@ export default function StructuralWorkspace({
                                     meshGroups={allGroupsData}
                                     currentGeometries={projectConfig.geometries}
                                     onUpdate={updateGeometries}
+                                    onModelCommandsUpdate={updateModelCommands}
                                 />
                             )}
                             {activeTab === 'mesh' && (
@@ -495,6 +569,7 @@ export default function StructuralWorkspace({
                                     projectPath={projectPath}
                                     meshes={meshFiles}
                                     meshGroups={allGroupsData}
+                                    onMeshCommandsUpdate={updateMeshCommands}
                                 />
                             )}
                             {activeTab === 'material' && (
@@ -503,8 +578,10 @@ export default function StructuralWorkspace({
                                     projectPath={projectPath}
                                     availableGroups={availableGroups}
                                     nodeGroups={nodeGroups}
+                                    meshGroups={allGroupsData}
                                     initialMaterials={projectConfig.materials}
                                     onUpdate={updateMaterials}
+                                    onMaterialCommandsUpdate={updateMaterialCommands}
                                 />
                             )}
 
@@ -515,6 +592,7 @@ export default function StructuralWorkspace({
                                     meshGroups={allGroupsData}
                                     availableGeometries={projectConfig.geometries}
                                     onUpdate={updateGeometries}
+                                    onGeometryCommandsUpdate={updateGeometryCommands}
                                 />
                             )}
 
@@ -544,6 +622,7 @@ export default function StructuralWorkspace({
                                     availableGroups={availableGroups} // Pass all groups - filtering done inside component
                                     initialRestrictions={projectConfig.restrictions}
                                     onUpdate={updateRestrictions}
+                                    onRestrictionCommandsUpdate={updateRestrictionCommands}
                                 />
                             )}
                             {activeTab === 'loads' && (
@@ -554,6 +633,7 @@ export default function StructuralWorkspace({
                                     meshGroups={allGroupsData}
                                     initialLoads={projectConfig.loads}
                                     onUpdate={updateLoads}
+                                    onLoadCommandsUpdate={updateLoadCommands}
                                 />
                             )}
                             {activeTab === 'loadcases' && (
@@ -609,6 +689,27 @@ export default function StructuralWorkspace({
                                 <SummaryConfig
                                     projectConfig={projectConfig}
                                 />
+                            )}
+                            {activeTab === 'simulation' && (
+                                <>
+                                    {console.log('🚀 StructuralWorkspace - Rendering SimulationExecution with:')}
+                                    {console.log('   projectConfig.mesh_commands:', projectConfig.mesh_commands)}
+                                    {console.log('   projectConfig.geometry_commands:', projectConfig.geometry_commands)}
+                                    {console.log('   projectConfig.material_commands:', projectConfig.material_commands)}
+                                    {console.log('   projectConfig.load_commands:', projectConfig.load_commands)}
+                                    {console.log('   projectConfig.restriction_commands:', projectConfig.restriction_commands)}
+                                    <SimulationExecution
+                                        projectPath={projectPath}
+                                        projectConfig={projectConfig}
+                                        meshCommands={projectConfig.mesh_commands}
+                                        modelCommands={projectConfig.model_commands}
+                                        materialCommands={projectConfig.material_commands}
+                                        loadCommands={projectConfig.load_commands}
+                                        restrictionCommands={projectConfig.restriction_commands}
+                                        onSimulationStart={() => setSimulationRunning(true)}
+                                        onSimulationComplete={() => setSimulationRunning(false)}
+                                    />
+                                </>
                             )}
                         </div>
                     </>

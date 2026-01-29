@@ -1,36 +1,91 @@
 {
     "geometries": [
         {
+            "group": "solid",
+            "type": "3D",
+            "phenomenon": "MECANIQUE",
+            "_category": "3D",
+            "_meshFile": "solid.med"
+        },
+        {
             "group": "I300x200x10x10",
-            "_meshFile": "beam.med",
-            "type": "POU_D_E",
+            "type": "POU_D_T",
             "phenomenon": "MECANIQUE",
             "_category": "1D",
-            "section_type": "BEAM"
+            "_meshFile": "beam.med",
+            "section_type": "BEAM",
+            "profile_type": "I_SECTION",
+            "profile_name": "I-Section",
+            "section_params": {
+                "h": 200,
+                "tw": 6.3,
+                "bf_top": 100,
+                "tf_top": 8,
+                "bf_bot": 100,
+                "tf_bot": 8,
+                "offset_y": 0,
+                "offset_z": 0,
+                "rotation": 0,
+                "fiber_y": 0,
+                "fiber_z": 0
+            }
+        },
+        {
+            "group": "_FULL_MESH_",
+            "type": "POU_D_T",
+            "phenomenon": "MECANIQUE",
+            "_category": "1D",
+            "_meshFile": "beam.med",
+            "section_type": "BEAM",
+            "profile_type": "I_SECTION",
+            "profile_name": "I-Section",
+            "section_params": {
+                "h": 200,
+                "tw": 6.3,
+                "bf_top": 100,
+                "tf_top": 8,
+                "bf_bot": 100,
+                "tf_bot": 8,
+                "offset_y": 0,
+                "offset_z": 0,
+                "rotation": 0,
+                "fiber_y": 0,
+                "fiber_z": 0
+            }
         },
         {
             "group": "Group_Of_All_Faces",
-            "_meshFile": "shell.med",
             "type": "COQUE_3D",
             "phenomenon": "MECANIQUE",
             "_category": "2D",
-            "section_type": "SHELL"
+            "_meshFile": "shell.med",
+            "section_type": "SHELL",
+            "profile_type": "SHELL",
+            "profile_name": "Custom",
+            "section_params": {
+                "thickness": 10,
+                "offset": 0,
+                "vx": 1,
+                "vy": 0,
+                "vz": 0
+            }
         },
         {
             "group": "group_shell",
-            "_meshFile": "shell.med",
-            "type": "AXIS",
-            "phenomenon": "THERMIQUE",
+            "type": "COQUE_3D",
+            "phenomenon": "MECANIQUE",
             "_category": "2D",
-            "section_type": "SHELL"
-        },
-        {
-            "group": "solid",
-            "_meshFile": "solid.med",
-            "type": "3D",
-            "phenomenon": "THERMIQUE",
-            "_category": "3D",
-            "section_type": "SOLID"
+            "_meshFile": "shell.med",
+            "section_type": "SHELL",
+            "profile_type": "SHELL",
+            "profile_name": "Custom",
+            "section_params": {
+                "thickness": 10,
+                "offset": 0,
+                "vx": 1,
+                "vy": 0,
+                "vz": 0
+            }
         }
     ],
     "materials": [],
@@ -47,6 +102,22 @@
     },
     "contacts": [],
     "connections": [],
+    "geometry_commands": {
+        "modeleCommands": [],
+        "caraCommands": [],
+        "validation": {
+            "isValid": false,
+            "errors": [],
+            "warnings": []
+        },
+        "summary": {
+            "totalGeometries": 0,
+            "beams": 0,
+            "shells": 0,
+            "hasSectionProperties": false,
+            "missingProperties": []
+        }
+    },
     "meshes": [
         {
             "name": "beam",

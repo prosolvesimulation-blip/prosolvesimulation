@@ -183,6 +183,27 @@ export class CodeAsterIntelligence {
                     typeHint: 'float',
                     description: 'Linear force density in Z direction', 
                     unit: 'N/m'
+                },
+                {
+                    name: 'MX',
+                    required: false,
+                    typeHint: 'float',
+                    description: 'Linear moment density about X axis',
+                    unit: 'N·m/m'
+                },
+                {
+                    name: 'MY',
+                    required: false, 
+                    typeHint: 'float',
+                    description: 'Linear moment density about Y axis',
+                    unit: 'N·m/m'
+                },
+                {
+                    name: 'MZ',
+                    required: false,
+                    typeHint: 'float',
+                    description: 'Linear moment density about Z axis', 
+                    unit: 'N·m/m'
                 }
             ],
             requiresModele: true,
@@ -366,8 +387,10 @@ export class CodeAsterIntelligence {
         // Load-specific validation
         if (loadType === LoadType.FORCE_NODALE || loadType === LoadType.FORCE_ARETE || loadType === LoadType.FORCE_FACE) {
             const hasForce = ['FX', 'FY', 'FZ'].some(param => param in parameters && parameters[param] !== 0)
-            if (!hasForce) {
-                warnings.push('No force components specified. Load will have no effect.')
+            const hasMoment = ['MX', 'MY', 'MZ'].some(param => param in parameters && parameters[param] !== 0)
+            
+            if (!hasForce && !hasMoment) {
+                warnings.push('No force or moment components specified. Load will have no effect.')
             }
         }
         

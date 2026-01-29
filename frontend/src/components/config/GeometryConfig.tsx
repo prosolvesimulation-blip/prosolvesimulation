@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
     Ruler,
     Layers,
@@ -8,14 +8,21 @@ import {
     Compass,
     Target,
     Maximize2,
-    Database
+    Database,
+    ChevronDown,
+    ChevronUp,
+    Copy,
+    CheckCircle,
+    Eye
 } from 'lucide-react'
+import { geometryIntelligence } from '../../lib/codeAster/builders/geometryIntelligence'
 
 interface GeometryConfigProps {
     projectPath: string | null
     meshGroups?: any
     availableGeometries?: any[]
     onUpdate?: (geometries: any[]) => void
+    onGeometryCommandsUpdate?: (commands: any) => void
 }
 
 const PROFILE_TYPES = {
@@ -28,7 +35,7 @@ const PROFILE_TYPES = {
 
 const SHELL_DEFAULT = { thickness: 10.0, offset: 0.0, vx: 1.0, vy: 0.0, vz: 0.0 }
 
-export default function GeometryConfig({ projectPath, availableGeometries = [], onUpdate }: GeometryConfigProps) {
+export default function GeometryConfig({ projectPath, availableGeometries = [], onUpdate, onGeometryCommandsUpdate }: GeometryConfigProps) {
     const [geometries, setGeometries] = useState<any[]>([])
     const [selectedIdx, setSelectedIdx] = useState(0)
     const [sectionImage, setSectionImage] = useState<string | null>(null)
@@ -36,8 +43,87 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
     const [calcLoading, setCalcLoading] = useState(false)
     const [calcError, setCalcError] = useState<string | null>(null)
     const [inspectorTab, setInspectorTab] = useState<'DIM' | 'PROP'>('DIM')
+    
+    // Code_Aster preview state
+    const [showPreview, setShowPreview] = useState(false)
+    const [copySuccess, setCopySuccess] = useState(false)
 
     const selected = geometries[selectedIdx] || null
+
+    // Track when availableGeometries prop changes
+    useEffect(() => {
+        console.log('🔄 [PROP] availableGeometries prop updated:', {
+            count: availableGeometries.length,
+            geometries: availableGeometries.map(g => ({
+                group: g.group,
+                category: g._category,
+                sectionParams: g.section_params,
+                sectionProperties: g.section_properties,
+                hasSectionParams: !!g.section_params,
+                hasSectionProperties: !!g.section_properties,
+                paramsCount: g.section_params ? Object.keys(g.section_params).length : 0,
+                propsCount: g.section_properties ? Object.keys(g.section_properties).length : 0
+            }))
+        })
+    }, [availableGeometries])
+
+    // Generate Code_Aster commands for each ready group individually
+    const geometryCommands = useMemo(() => {
+        console.log('🔍 [GEOMETRY] Checking .comm generation for individual groups...')
+        console.log('📊 [GEOMETRY] Available geometries:', availableGeometries.map(g => ({
+            group: g.group,
+            category: g._category,
+            hasParams: !!g.section_params,
+            hasProps: !!g.section_properties,
+            shellThickness: g._category === '2D' ? g.section_params?.thickness : 'N/A',
+            beamInertias: g._category === '1D' ? {
+                area: g.section_properties?.["Area (A)"],
+                iy: g.section_properties?.["Iyy (Node 0,0)"],
+                iz: g.section_properties?.["Izz (Node 0,0)"]
+            } : 'N/A'
+        })))
+        
+        // Filter geometries that are ready for command generation
+        const readyGeometries = availableGeometries.filter(g => {
+            if (g._category === '2D') {
+                // Shells: Need section_params (thickness, etc.)
+                const isReady = g.section_params && Object.keys(g.section_params).length > 0
+                console.log(`🔸 [SHELL] ${g.group}: ready = ${isReady} (has params: ${!!g.section_params})`)
+                return isReady
+            } else if (g._category === '1D') {
+                // Beams: Need section_properties (calculated inertias)
+                const isReady = g.section_properties && Object.keys(g.section_properties).length > 0
+                console.log(`🔸 [BEAM] ${g.group}: ready = ${isReady} (has props: ${!!g.section_properties})`)
+                return isReady
+            }
+            return false
+        })
+        
+        console.log(`✅ [GEOMETRY] Ready groups: ${readyGeometries.length}/${availableGeometries.length}`)
+        console.log('📝 [GEOMETRY] Ready geometries:', readyGeometries.map(g => g.group))
+        
+        if (readyGeometries.length === 0) {
+            console.log('⏳ [GEOMETRY] No groups ready, waiting...')
+            return {
+                modeleCommands: [],
+                caraCommands: [],
+                validation: { isValid: false, errors: [], warnings: [] },
+                summary: { totalGeometries: availableGeometries.length, beams: 0, shells: 0, hasSectionProperties: false, missingProperties: [] }
+            }
+        }
+        
+        console.log('✅ [GEOMETRY] Generating .comm commands for ready groups')
+        const commands = geometryIntelligence.generateGeometryCommands(readyGeometries)
+        console.log('📝 [GEOMETRY] Generated commands:', commands.summary)
+        return commands
+    }, [availableGeometries])
+
+    // Update global state when geometry commands change
+    useEffect(() => {
+        if (onGeometryCommandsUpdate && geometryCommands) {
+            onGeometryCommandsUpdate(geometryCommands)
+        }
+    }, [geometryCommands, onGeometryCommandsUpdate])
 
     // Load geometries
     useEffect(() => {
@@ -126,17 +212,43 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
             const data = await response.json()
 
             if (data.status === 'success') {
+                console.log('🧮 [GEOMETRY] Section calculation completed for:', selected.group)
                 setSectionImage(data.image)
                 setCalculatedProps(data.properties)
 
-                setGeometries(prev => prev.map((g, i) =>
+                const updatedGeometries = geometries.map((g, i) =>
                     i === selectedIdx ? {
                         ...g,
                         section_properties: data.properties,
                         section_mesh: data.mesh,
                         section_image: data.image
                     } : g
-                ))
+                )
+                
+                console.log('🔄 [GEOMETRY] Updating global state with section properties')
+                console.log('📤 [GLOBAL] Sending to global state:', updatedGeometries.map(g => ({
+                    group: g.group,
+                    category: g._category,
+                    hasSectionProps: !!g.section_properties,
+                    propsCount: g.section_properties ? Object.keys(g.section_properties).length : 0,
+                    propsSample: g.section_properties ? {
+                        area: g.section_properties["Area (A)"],
+                        iy: g.section_properties["Iyy (Node 0,0)"],
+                        iz: g.section_properties["Izz (Node 0,0)"]
+                    } : null
+                })))
+                
+                // Update local state
+                setGeometries(updatedGeometries)
+                
+                // Update global state through callback
+                if (onUpdate) {
+                    console.log('📞 [CALLBACK] Calling onUpdate callback...')
+                    onUpdate(updatedGeometries)
+                    console.log('✅ [CALLBACK] onUpdate callback completed')
+                } else {
+                    console.log('❌ [CALLBACK] onUpdate callback is null/undefined')
+                }
             } else {
                 throw new Error(data.message)
             }
@@ -148,20 +260,45 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
     }
 
     const handleParamEdit = (idx: number, key: string, value: string) => {
-        setGeometries(prev => prev.map((g, i) =>
+        console.log('✏️ [EDIT] Editing parameter:', { idx, key, value, group: geometries[idx]?.group })
+        
+        const updatedGeometries = geometries.map((g, i) =>
             i === idx ? { ...g, profile_name: 'Custom', section_params: { ...g.section_params, [key]: value } } : g
-        ))
+        )
+        
+        console.log('📤 [EDIT] Updated geometries for global state:', updatedGeometries.map(g => ({
+            group: g.group,
+            category: g._category,
+            sectionParams: g.section_params
+        })))
+        
+        setGeometries(updatedGeometries)
+        
+        // Update global state through callback
+        if (onUpdate) {
+            console.log('📞 [EDIT] Calling onUpdate callback for parameter edit...')
+            onUpdate(updatedGeometries)
+            console.log('✅ [EDIT] Parameter edit callback completed')
+        } else {
+            console.log('❌ [EDIT] onUpdate callback is null/undefined during parameter edit')
+        }
     }
 
     const handleSectionTypeChange = (idx: number, profileType: string) => {
-        setGeometries(prev => prev.map((g, i) =>
+        const updatedGeometries = geometries.map((g, i) =>
             i === idx ? { 
                 ...g, 
                 profile_type: profileType,  // Update profile type for calculation
                 profile_name: PROFILE_TYPES[profileType as keyof typeof PROFILE_TYPES]?.label || 'Custom',
                 section_params: { ...(PROFILE_TYPES as any)[profileType].default } 
             } : g
-        ))
+        )
+        setGeometries(updatedGeometries)
+        
+        // Update global state through callback
+        if (onUpdate) {
+            onUpdate(updatedGeometries)
+        }
     }
 
     if (!projectPath) return <div className="p-10 text-center text-slate-500 font-mono italic">SESSION_HALTED: PROJECT_ID_NULL</div>
@@ -180,7 +317,7 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
     const isShell = selected?._category === '2D'
 
     return (
-        <div className="flex h-full w-full bg-slate-950 text-slate-200 border border-slate-800 overflow-hidden font-sans">
+        <div className="flex h-full w-full bg-slate-950 text-slate-200 border border-slate-800 overflow-y-auto font-sans">
             {/* Sidebar: Group Inventory */}
             <div className="w-64 shrink-0 border-r border-slate-800 flex flex-col bg-slate-900/10">
                 <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex items-center justify-between">
@@ -476,6 +613,121 @@ export default function GeometryConfig({ projectPath, availableGeometries = [], 
                             </div>
                             <span>Z-Axis Normal | Auto-Scale Active</span>
                         </div>
+                    </div>
+                </div>
+
+                {/* Code_Aster Preview Panel - Moved inside main content */}
+                <div className="border-t border-slate-800 bg-slate-950">
+                    <div className="p-4">
+                        <button
+                            onClick={() => setShowPreview(!showPreview)}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors mb-4"
+                        >
+                            <Eye className="w-3 h-3" />
+                            Code_Aster Element Characteristics Preview
+                            {showPreview ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        {showPreview && (
+                            <div className="space-y-4">
+                                {/* Synchronization Status */}
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 rounded-full ${geometryCommands.validation.isValid ? 'bg-green-500' : calcLoading ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`}></div>
+                                    <span className="text-[9px] font-mono text-slate-600">
+                                        {!geometryCommands.validation.isValid ? (
+                                            calcLoading ? 'Calculating section properties...' : 'Waiting for element characteristics data...'
+                                        ) : `Ready (${geometryCommands.summary.beams + geometryCommands.summary.shells} groups)`}
+                                    </span>
+                                </div>
+
+                                {/* Validation Status */}
+                                {geometryCommands.validation.errors.length > 0 && (
+                                    <div className="border border-red-500/20 bg-red-500/5 p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <AlertCircle className="w-3 h-3 text-red-500" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-red-500">Validation Errors</span>
+                                        </div>
+                                        {geometryCommands.validation.errors.map((error, idx) => (
+                                            <div key={idx} className="text-[9px] font-mono text-red-400">{error}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {geometryCommands.validation.warnings.length > 0 && (
+                                    <div className="border border-yellow-500/20 bg-yellow-500/5 p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <AlertCircle className="w-3 h-3 text-yellow-500" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-yellow-500">Warnings</span>
+                                        </div>
+                                        {geometryCommands.validation.warnings.map((warning, idx) => (
+                                            <div key={idx} className="text-[9px] font-mono text-yellow-400">{warning}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Element Characteristics Display */}
+                                {geometryCommands.validation.isValid && (
+                                    <div className="space-y-3">
+                                        {/* Summary */}
+                                        <div className="grid grid-cols-5 gap-4 text-[9px] font-mono text-slate-600 border border-slate-800 p-3">
+                                            <div>
+                                                <div className="text-slate-500">Total</div>
+                                                <div className="text-slate-300">{geometryCommands.summary.totalGeometries}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-slate-500">Beams</div>
+                                                <div className="text-slate-300">{geometryCommands.summary.beams}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-slate-500">Shells</div>
+                                                <div className="text-slate-300">{geometryCommands.summary.shells}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-slate-500">Properties</div>
+                                                <div className={geometryCommands.summary.hasSectionProperties ? 'text-green-500' : 'text-red-500'}>
+                                                    {geometryCommands.summary.hasSectionProperties ? 'Complete' : 'Missing'}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-slate-500">Status</div>
+                                                <div className="text-green-500">Ready</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Code Display */}
+                                        <div className="relative">
+                                            <div className="absolute top-2 right-2 z-10">
+                                                <button
+                                                    onClick={() => {
+                                                        const fullCommand = [...geometryCommands.modeleCommands, ...geometryCommands.caraCommands].join('\n')
+                                                        navigator.clipboard.writeText(fullCommand)
+                                                        setCopySuccess(true)
+                                                        setTimeout(() => setCopySuccess(false), 2000)
+                                                    }}
+                                                    className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[8px] font-mono text-slate-400 transition-colors"
+                                                    disabled={!geometryCommands.validation.isValid}
+                                                >
+                                                    {copySuccess ? (
+                                                        <>
+                                                            <CheckCircle className="w-3 h-3 text-green-500" />
+                                                            Copied
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="w-3 h-3" />
+                                                            Copy
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                            <pre className="bg-black/50 border border-slate-800 p-4 text-[9px] font-mono text-slate-400 overflow-x-auto">
+                                                {[...geometryCommands.modeleCommands, ...geometryCommands.caraCommands].join('\n')}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

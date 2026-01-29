@@ -10,8 +10,15 @@ import {
     Search,
     AlertCircle,
     Info,
-    Check
+    Check,
+    Code,
+    Copy,
+    ChevronDown,
+    ChevronUp,
+    Terminal
 } from 'lucide-react'
+import { materialIntelligence } from '../../lib/codeAster/builders/materialIntelligence'
+import type { MaterialDefinition, MaterialCommandsResult } from '../../lib/codeAster/builders/materialIntelligence'
 
 interface Material {
     id: string
@@ -26,8 +33,10 @@ interface MaterialConfigProps {
     projectPath: string | null
     availableGroups?: string[]
     nodeGroups?: string[]
+    meshGroups?: Record<string, any>
     initialMaterials?: any[]
     onUpdate?: (materials: any[]) => void
+    onMaterialCommandsUpdate?: (commands: any) => void
 }
 
 const MATERIAL_PRESETS = [
@@ -43,13 +52,16 @@ export default function MaterialConfig({
     availableGroups = [],
     nodeGroups = [],
     initialMaterials = [],
-    onUpdate
+    onUpdate,
+    onMaterialCommandsUpdate
 }: MaterialConfigProps) {
     const isFirstRender = useRef(true)
     const [materials, setMaterials] = useState<Material[]>([])
     const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)
     const [groupFilter, setGroupFilter] = useState('')
     const [unitType, setUnitType] = useState<'MPa' | 'Pa'>('MPa')
+    const [showCommPreview, setShowCommPreview] = useState(false)
+    const [copiedToClipboard, setCopiedToClipboard] = useState(false)
     const lastInitializedPath = useRef<string | null>(null)
 
     // Filter valid groups (Exclude Nodes)
@@ -57,6 +69,51 @@ export default function MaterialConfig({
         const nodeSet = new Set(nodeGroups)
         return availableGroups.filter(g => !nodeSet.has(g))
     }, [availableGroups, nodeGroups])
+
+    // Convert to MaterialDefinition format for intelligence
+    const materialDefinitions: MaterialDefinition[] = useMemo(() => {
+        return materials.map(mat => ({
+            id: mat.id,
+            name: mat.name,
+            props: {
+                E: parseFloat(mat.E), // Use exact input value without conversion
+                NU: parseFloat(mat.nu),
+                RHO: parseFloat(mat.rho)
+            },
+            assignedGroups: mat.assignedGroups || []
+        }))
+    }, [materials])
+
+    // Generate Code_Aster commands
+    const materialCommands: MaterialCommandsResult = useMemo(() => {
+        return materialIntelligence.generateMaterialCommands(materialDefinitions)
+    }, [materialDefinitions])
+    
+    // Update parent with material commands when they change
+    useEffect(() => {
+        if (onMaterialCommandsUpdate && materialCommands) {
+            onMaterialCommandsUpdate(materialCommands)
+        }
+    }, [materialCommands, onMaterialCommandsUpdate])
+
+    // Copy to clipboard functionality
+    const copyToClipboard = async () => {
+        const fullCommands = [
+            '# --- 4. Definição de Materiais ---',
+            ...materialCommands.defiCommands,
+            '',
+            '# --- 5. Atribuição de Materiais ---',
+            ...materialCommands.affeCommands
+        ].filter(Boolean).join('\n')
+        
+        try {
+            await navigator.clipboard.writeText(fullCommands)
+            setCopiedToClipboard(true)
+            setTimeout(() => setCopiedToClipboard(false), 2000)
+        } catch (err: any) {
+            console.error('Failed to copy to clipboard:', err)
+        }
+    }
 
     // Coverage Stats
     const stats = useMemo(() => {
@@ -368,80 +425,153 @@ export default function MaterialConfig({
                                 </div>
                             </div>
 
-                            {/* Group Assignment - RADICAL UPDATE */}
-                            <div className="border border-slate-800 bg-slate-900/10">
-                                <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/30">
-                                    <div className="flex items-center gap-3">
-                                        <Layers className="w-5 h-5 text-orange-500" />
-                                        <div>
-                                            <h4 className="text-sm font-black text-white uppercase tracking-wider">Group Integration Manager</h4>
-                                            <p className="text-[10px] text-slate-500 mt-0.5">Map finite element groups to this structural resource.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="relative">
-                                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-                                            <input
-                                                type="text"
-                                                placeholder="Filter Groups..."
-                                                value={groupFilter}
-                                                onChange={e => setGroupFilter(e.target.value)}
-                                                className="bg-slate-950 border border-slate-800 rounded-[2px] pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 w-48 transition-all"
-                                            />
-                                        </div>
+                        {/* Group Assignment - RADICAL UPDATE */}
+                        <div className="border border-slate-800 bg-slate-900/10">
+                            <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/30">
+                                <div className="flex items-center gap-3">
+                                    <Layers className="w-5 h-5 text-orange-500" />
+                                    <div>
+                                        <h4 className="text-sm font-black text-white uppercase tracking-wider">Group Integration Manager</h4>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">Map finite element groups to this structural resource.</p>
                                     </div>
                                 </div>
-
-                                <div className="p-6">
-                                    {validGroups.length > 0 ? (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
-                                            {validGroups
-                                                .filter(g => g.toLowerCase().includes(groupFilter.toLowerCase()))
-                                                .map(group => {
-                                                    const isAssigned = (selectedMaterial.assignedGroups || []).includes(group)
-                                                    const owner = materials.find(m => m.id !== selectedMaterial.id && m.assignedGroups.includes(group))
-
-                                                    return (
-                                                        <button
-                                                            key={group}
-                                                            onClick={() => toggleGroup(selectedMaterial.id, group)}
-                                                            className={`
-                                                                relative flex flex-col group/btn px-4 py-3 border text-left transition-all active:scale-[0.98]
-                                                                ${isAssigned
-                                                                    ? 'bg-orange-500 border-orange-400 text-slate-950 shadow-[0_0_15px_rgba(249,115,22,0.2)]'
-                                                                    : owner
-                                                                        ? 'bg-slate-900/50 border-slate-800 text-slate-600 opacity-60 hover:opacity-100 hover:border-orange-500/50'
-                                                                        : 'bg-slate-900/20 border-slate-800 text-slate-400 hover:border-slate-500 hover:bg-slate-800/40'
-                                                                } rounded-[2px]
-                                                            `}
-                                                        >
-                                                            <div className="flex items-center justify-between mb-1">
-                                                                <span className={`text-[10px] font-black uppercase truncate pr-4`}>{group}</span>
-                                                                {isAssigned && <Check className="w-3 h-3" />}
-                                                            </div>
-                                                            {owner && (
-                                                                <span className="text-[8px] font-mono opacity-60">Taken by: {owner.name}</span>
-                                                            )}
-                                                            {!isAssigned && !owner && (
-                                                                <span className="text-[8px] font-mono opacity-30 mt-auto">Available</span>
-                                                            )}
-                                                            {owner && !isAssigned && (
-                                                                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 opacity-0 group-hover/btn:opacity-100 transition-opacity">
-                                                                    <span className="text-[10px] font-black text-orange-500">TRANSFER TO THIS</span>
-                                                                </div>
-                                                            )}
-                                                        </button>
-                                                    )
-                                                })}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-800 rounded-[2px]">
-                                            <AlertCircle className="w-8 h-8 text-slate-700 mb-4" />
-                                            <p className="text-xs font-mono text-slate-600 uppercase">No signal from mesh groups detector.</p>
-                                        </div>
-                                    )}
+                                <div className="flex items-center gap-4">
+                                    <div className="relative">
+                                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                                        <input
+                                            type="text"
+                                            placeholder="Filter Groups..."
+                                            value={groupFilter}
+                                            onChange={e => setGroupFilter(e.target.value)}
+                                            className="bg-slate-950 border border-slate-800 rounded-[2px] pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500 w-48 transition-all"
+                                        />
+                                    </div>
                                 </div>
                             </div>
+
+                            <div className="p-6">
+                                {validGroups.length > 0 ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+                                        {validGroups
+                                            .filter(g => g.toLowerCase().includes(groupFilter.toLowerCase()))
+                                            .map(group => {
+                                                const isAssigned = (selectedMaterial.assignedGroups || []).includes(group)
+                                                const owner = materials.find(m => m.id !== selectedMaterial.id && m.assignedGroups.includes(group))
+
+                                                return (
+                                                    <button
+                                                        key={group}
+                                                        onClick={() => toggleGroup(selectedMaterial.id, group)}
+                                                        className={`
+                                                            relative flex flex-col group/btn px-4 py-3 border text-left transition-all active:scale-[0.98]
+                                                            ${isAssigned
+                                                                ? 'bg-orange-500 border-orange-400 text-slate-950 shadow-[0_0_15px_rgba(249,115,22,0.2)]'
+                                                                : owner
+                                                                    ? 'bg-slate-900/50 border-slate-800 text-slate-600 opacity-60 hover:opacity-100 hover:border-orange-500/50'
+                                                                    : 'bg-slate-900/20 border-slate-800 text-slate-400 hover:border-slate-500 hover:bg-slate-800/40'
+                                                            } rounded-[2px]
+                                                        `}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className={`text-[10px] font-black uppercase truncate pr-4`}>{group}</span>
+                                                            {isAssigned && <Check className="w-3 h-3" />}
+                                                        </div>
+                                                        {owner && (
+                                                            <span className="text-[8px] font-mono opacity-60">Taken by: {owner.name}</span>
+                                                        )}
+                                                        {!isAssigned && !owner && (
+                                                            <span className="text-[8px] font-mono opacity-30 mt-auto">Available</span>
+                                                        )}
+                                                        {owner && !isAssigned && (
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                                                                <span className="text-[10px] font-black text-orange-500">TRANSFER TO THIS</span>
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                )
+                                            })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-800 rounded-[2px]">
+                                        <AlertCircle className="w-8 h-8 text-slate-700 mb-4" />
+                                        <p className="text-xs font-mono text-slate-600 uppercase">No signal from mesh groups detector.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Aster Command Preview */}
+                        <div className="border border-slate-800 bg-slate-900/10">
+                            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/30">
+                                <div className="flex items-center gap-3">
+                                    <Terminal className="w-5 h-5 text-orange-500" />
+                                    <div>
+                                        <h4 className="text-sm font-black text-white uppercase tracking-wider">Code_Aster Command Preview</h4>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">Generated DEFI_MATERIAU and AFFE_MATERIAU commands</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowCommPreview(!showCommPreview)}
+                                        className="p-1.5 border border-slate-700 text-slate-400 hover:border-orange-500 hover:text-orange-500 transition-all rounded-[2px]"
+                                    >
+                                        {showCommPreview ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={copyToClipboard}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase hover:border-orange-500 hover:text-orange-500 transition-all rounded-[2px]"
+                                    >
+                                        {copiedToClipboard ? (
+                                            <><Check className="w-3.5 h-3.5" /> Copied!</>
+                                        ) : (
+                                            <><Copy className="w-3.5 h-3.5" /> Copy</>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {showCommPreview && (
+                                <div className="border-t border-slate-800">
+                                    {/* Commands Display */}
+                                    <div className="p-4">
+                                        <div className="space-y-4">
+                                            {/* DEFI_MATERIAU Commands */}
+                                            {materialCommands.defiCommands.length > 0 && (
+                                                <div>
+                                                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">DEFI_MATERIAU Commands</h5>
+                                                    <div className="bg-slate-950 border border-slate-800 rounded-[2px] p-3 overflow-x-auto">
+                                                        <pre className="text-[10px] font-mono text-emerald-400 whitespace-pre-wrap">
+                                                            {materialCommands.defiCommands.join('\n\n')}
+                                                        </pre>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* AFFE_MATERIAU Commands */}
+                                            {materialCommands.affeCommands.length > 0 && (
+                                                <div>
+                                                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">AFFE_MATERIAU Command</h5>
+                                                    <div className="bg-slate-950 border border-slate-800 rounded-[2px] p-3 overflow-x-auto">
+                                                        <pre className="text-[10px] font-mono text-emerald-400 whitespace-pre-wrap">
+                                                            {materialCommands.affeCommands.join('\n\n')}
+                                                        </pre>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {materialCommands.defiCommands.length === 0 && materialCommands.affeCommands.length === 0 && (
+                                                <div className="text-center py-8 text-slate-600">
+                                                    <Code className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                                    <p className="text-[10px] font-mono uppercase">No commands to generate</p>
+                                                    <p className="text-[9px] text-slate-700 mt-1">Add materials with assigned groups to generate commands</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         </div>
                     </>
                 ) : (

@@ -9,9 +9,14 @@ import {
     Settings2,
     Activity,
     Database,
-    AlertCircle
+    AlertCircle,
+    FileCode2,
+    ChevronDown,
+    ChevronUp,
+    Copy
 } from 'lucide-react'
 import modelOptionsData from '../../data/modelOptions.json'
+import { modelIntelligence, type ModelCommandsResult } from '../../lib/codeAster/builders/affeModele'
 
 type PhysicsApplication = 'MECANIQUE' | 'THERMIQUE' | 'ACOUSTIQUE'
 
@@ -46,6 +51,7 @@ interface ModelConfigProps {
     meshGroups?: any
     currentGeometries?: any[]
     onUpdate?: (geometries: any[]) => void
+    onModelCommandsUpdate?: (commands: { commPreview: string, caraCommands: string[] }) => void
 }
 
 const ELEMENT_TYPE_MAP: Record<string, '1D' | '2D' | '3D'> = {
@@ -76,15 +82,17 @@ const CATEGORY_COLORS: Record<string, string> = {
     'Node': 'text-slate-500 border-slate-500/30 bg-slate-500/10',
 }
 
-export default function ModelConfig({ projectPath, meshGroups, currentGeometries = [], onUpdate }: ModelConfigProps) {
+export default function ModelConfig({ projectPath, meshGroups, currentGeometries = [], onUpdate, onModelCommandsUpdate }: ModelConfigProps) {
     const [groups, setGroups] = useState<MeshGroup[]>([])
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [filterCategory, setFilterCategory] = useState<string | 'all'>('all')
+    const [isCodeOpen, setIsCodeOpen] = useState(false)
 
     const isFirstRender = useRef(true)
     const lastGroupsSignatureRef = useRef<string>('')
     const lastExportSignatureRef = useRef<string>('')
+    const isSyncingFromProps = useRef(false)
 
     // Physics detection and filtering functions
     const getAvailablePhysicsForElementType = (medType: string): PhysicsApplication[] => {
@@ -192,9 +200,14 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
             if (signature === lastGroupsSignatureRef.current) return
             lastGroupsSignatureRef.current = signature
 
+            isSyncingFromProps.current = true
+
             const loadedGroups: MeshGroup[] = []
             Object.entries(meshGroups).forEach(([fileName, groupsInFile]: [string, any]) => {
                 Object.entries(groupsInFile).forEach(([groupName, info]: [string, any]) => {
+                    // Filter out _FULL_MESH_ groups
+                    if (groupName === '_FULL_MESH_') return
+                    
                     const basicCategory = info.category || detectCategory(info.types || {})
                     if (basicCategory === 'Node' || basicCategory === 'Point') return
 
@@ -212,7 +225,7 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                     loadedGroups.push({
                         name: groupName,
                         meshFile: fileName,
-                        selected: currentGeometries.length > 0 ? !!existingConfig : true,
+                        selected: !!existingConfig,
                         count: info.count,
                         composition: compStr,
                         category: validatedCategory, // Use validated category
@@ -229,6 +242,10 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                 validatedCategory: getValidatedCategory(g.medType || '', g.category)
             })))
             setGroups(loadedGroups)
+            
+            setTimeout(() => {
+                isSyncingFromProps.current = false
+            }, 0)
         }
     }, [meshGroups, currentGeometries])
 
@@ -238,6 +255,9 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
             isFirstRender.current = false
             return
         }
+
+        // Don't propagate if this is a sync from props (not user interaction)
+        if (isSyncingFromProps.current) return
 
         if (onUpdate) {
             const exportData = groups
@@ -264,7 +284,7 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                 onUpdate(exportData)
             }
         }
-    }, [groups, onUpdate])
+    }, [groups, onUpdate, currentGeometries])
 
     const detectCategory = (typesObj: any): string => {
         const types = Object.keys(typesObj)
@@ -329,6 +349,43 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
         const [file, name] = selectedGroupId.split(':')
         return groups.find(g => g.meshFile === file && g.name === name) || null
     }, [groups, selectedGroupId])
+
+    // Generate model commands and validation
+    const modelCommands = useMemo((): ModelCommandsResult => {
+        const selectedGroups = groups.filter(g => g.selected)
+        const exportData = selectedGroups.map(g => ({
+            group: g.name,
+            type: g.model,
+            phenomenon: g.phenomenon
+        }))
+        
+        return modelIntelligence.generateModelCommands(exportData)
+    }, [groups])
+
+    // Generate .comm preview
+    const commPreview = useMemo(() => {
+        const selectedGroups = groups.filter(g => g.selected)
+        const exportData = selectedGroups.map(g => ({
+            group: g.name,
+            type: g.model,
+            phenomenon: g.phenomenon
+        }))
+        
+        return modelIntelligence.generateCommPreview(exportData)
+    }, [groups])
+
+    // Convert to expected structure for parent component
+    const modelCommandsForParent = useMemo(() => ({
+        commPreview: commPreview,
+        caraCommands: []
+    }), [commPreview])
+
+    useEffect(() => {
+        if (onModelCommandsUpdate) {
+            console.log('ModelConfig - Sending commPreview:', commPreview)
+            onModelCommandsUpdate(modelCommandsForParent)
+        }
+    }, [modelCommandsForParent, onModelCommandsUpdate, commPreview])
 
     if (!projectPath) return (
         <div className="flex flex-col items-center justify-center h-full p-10 bg-[#0B0F19] text-slate-500 font-mono relative overflow-hidden">
@@ -651,6 +708,111 @@ export default function ModelConfig({ projectPath, meshGroups, currentGeometries
                             <Search className="w-8 h-8 text-slate-500" />
                         </div>
                         <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Awaiting Selection</span>
+                    </div>
+                )}
+
+                {/* Code_Aster Command Preview */}
+                {groups.filter(g => g.selected).length > 0 && (
+                    <div className="border-t border-white/5 bg-slate-900/30">
+                        <button 
+                            onClick={() => setIsCodeOpen(!isCodeOpen)}
+                            className="w-full flex items-center justify-between p-4 hover:bg-slate-900/60 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <FileCode2 className="w-4 h-4 text-cyan-400" />
+                                <div>
+                                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Code_Aster Command Preview</h3>
+                                    <p className="text-[9px] text-slate-400 font-mono mt-1">
+                                        {modelCommands.commands.length} AFFE_MODELE assignments
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className={`px-2 py-1 rounded text-[8px] font-black uppercase ${
+                                    modelCommands.validation.isValid 
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                }`}>
+                                    {modelCommands.validation.isValid ? 'Valid' : 'Invalid'}
+                                </div>
+                                {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                            </div>
+                        </button>
+                        
+                        {isCodeOpen && (
+                            <div className="border-t border-white/5">
+                                {/* Validation Errors */}
+                                {!modelCommands.validation.isValid && (
+                                    <div className="p-4 bg-red-500/10 border border-red-500/20">
+                                        <div className="flex items-start gap-3">
+                                            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5" />
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-red-300 uppercase tracking-widest mb-2">Validation Errors</h4>
+                                                {modelCommands.validation.errors.map((error, index) => (
+                                                    <div key={index} className="text-[9px] text-red-200 font-mono">• {error}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Warnings */}
+                                {modelCommands.validation.warnings.length > 0 && (
+                                    <div className="p-4 bg-amber-500/10 border border-amber-500/20">
+                                        <div className="flex items-start gap-3">
+                                            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5" />
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-amber-300 uppercase tracking-widest mb-2">Warnings</h4>
+                                                {modelCommands.validation.warnings.map((warning, index) => (
+                                                    <div key={index} className="text-[9px] text-amber-200 font-mono">• {warning}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="relative group">
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button 
+                                            onClick={() => navigator.clipboard.writeText(commPreview)}
+                                            className="p-2 hover:bg-slate-800 rounded transition-colors text-slate-500 hover:text-white"
+                                            title="Copy to clipboard"
+                                        >
+                                            <Copy className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <pre className="p-6 bg-slate-950 font-mono text-xs text-cyan-300 leading-relaxed overflow-x-auto">
+                                        <code>{commPreview}</code>
+                                    </pre>
+                                </div>
+                                
+                                {/* Model Info Summary */}
+                                <div className="p-4 bg-slate-900/50 border-t border-white/5">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[9px]">
+                                        <div>
+                                            <span className="text-slate-500 uppercase tracking-wider">Model Name:</span>
+                                            <span className="ml-2 text-white font-mono">{modelCommands.finalModelName}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 uppercase tracking-wider">Assignments:</span>
+                                            <span className="ml-2 text-white font-mono">{modelCommands.commands.length}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 uppercase tracking-wider">Physics:</span>
+                                            <span className="ml-2 text-white font-mono">
+                                                {[...new Set(modelCommands.commands.map(c => c.phenomenene))].join(', ')}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 uppercase tracking-wider">Status:</span>
+                                            <span className="ml-2 text-white font-mono">
+                                                {modelCommands.validation.isValid ? 'Ready' : 'Fix Errors'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
