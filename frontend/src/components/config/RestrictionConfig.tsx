@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
     Trash2, Shield, AlertTriangle,
-    Box, Layers, Minus, 
+    Box, Layers, Minus,
     Move3d, ArrowUpFromLine, Maximize2, FileCode2, Copy,
     AlertCircle, ChevronDown, ChevronUp, Anchor, MousePointer2
 } from 'lucide-react'
@@ -11,26 +11,6 @@ import {
 type ConstraintType = 'DDL_IMPO' | 'FACE_IMPO' | 'ARETE_IMPO' | 'PRE_EPSI';
 type MeshTopology = 'NODE' | 'WIRE' | 'SURFACE' | 'VOLUME' | 'COMPOUND' | 'UNKNOWN';
 
-const ELEMENT_TYPE_MAP: Record<string, '1D' | '2D' | '3D'> = {
-    // 1D Elements
-    'SEG': '1D',
-    'POU_D': '1D', 
-    'BARRE': '1D',
-    'CABLE': '1D',
-    
-    // 2D Elements  
-    'QUAD': '2D',
-    'TRIA': '2D',
-    'DKT': '2D',
-    'DST': '2D',
-    'COQUE': '2D',
-    'MEMBRANE': '2D',
-    
-    // 3D Elements
-    'HEXA': '3D',
-    'TETRA': '3D', 
-    'PENTA': '3D'
-}
 
 export interface GroupMetadata {
     name: string
@@ -41,8 +21,9 @@ export interface GroupMetadata {
 interface RestrictionConfigProps {
     projectPath?: string | null
     // Aceita qualquer formato vindo do pai, tentaremos normalizar internamente
-    availableGroups?: any[] 
-    initialRestrictions?: any[] 
+    availableGroups?: string[]
+    meshGroups?: any // NEW: DNA da malha
+    initialRestrictions?: any[]
     onUpdate?: (data: any) => void
     onRestrictionCommandsUpdate?: (commands: any) => void
 }
@@ -52,7 +33,7 @@ interface KinematicConstraint {
     name: string
     type: ConstraintType
     targetGroup: string
-    
+
     // DOFs
     dof_trans: { x: boolean; y: boolean; z: boolean }
     dof_rot: { x: boolean; y: boolean; z: boolean }
@@ -73,7 +54,7 @@ const CONSTRAINT_DEFS = {
     'DDL_IMPO': {
         label: 'Nodal Constraint',
         description: 'Standard Dirichlet condition.',
-        allowedTopology: ['NODE'], 
+        allowedTopology: ['NODE'],
         icon: Move3d,
         color: 'text-blue-400',
         bg: 'bg-blue-400/10'
@@ -106,14 +87,15 @@ const CONSTRAINT_DEFS = {
 
 // --- Componente Principal ---
 
-export default function RestrictionConfig({ 
+export default function RestrictionConfig({
     projectPath,
     availableGroups = [],
+    meshGroups = {}, // NEW
     initialRestrictions = [],
     onUpdate,
     onRestrictionCommandsUpdate
 }: RestrictionConfigProps) {
-    
+
     const [constraints, setConstraints] = useState<KinematicConstraint[]>(initialRestrictions)
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [isCodeOpen, setIsCodeOpen] = useState(true)
@@ -127,64 +109,55 @@ export default function RestrictionConfig({
 
     // --- ADAPTER LAYER: Normalização Inteligente de Grupos ---
     const normalizedGroups: GroupMetadata[] = useMemo(() => {
+        // Priority A: Use meshGroups metadata (DNA)
+        if (meshGroups && Object.keys(meshGroups).length > 0) {
+            const results: GroupMetadata[] = [];
+
+            Object.values(meshGroups).forEach((fileData: any) => {
+                const groups = fileData.groups || {};
+                Object.entries(groups).forEach(([gName, gInfo]: [string, any]) => {
+                    if (gName === '_FULL_MESH_') return;
+
+                    let topo: MeshTopology = 'UNKNOWN';
+                    const category = gInfo.category;
+
+                    if (category === 'Node') topo = 'NODE';
+                    else if (category === '1D') topo = 'WIRE';
+                    else if (category === '2D') topo = 'SURFACE';
+                    else if (category === '3D') topo = 'VOLUME';
+
+                    // Fallback to detection if category is missing
+                    if (topo === 'UNKNOWN') {
+                        const dim = gInfo.dimension ?? gInfo.dim;
+                        if (dim === 0) topo = 'NODE';
+                        else if (dim === 1) topo = 'WIRE';
+                        else if (dim === 2) topo = 'SURFACE';
+                        else if (dim === 3) topo = 'VOLUME';
+                    }
+
+                    results.push({
+                        name: gName,
+                        topology: topo,
+                        count: gInfo.count || 0
+                    });
+                });
+            });
+
+            if (results.length > 0) return results;
+        }
+
+        // Priority B: Fallback to availableGroups (string array)
         if (!availableGroups || availableGroups.length === 0) return [];
 
         return availableGroups.map((g: any) => {
-            // 1. Se for string pura
-            if (typeof g === 'string') {
-                return { 
-                    name: g, 
-                    topology: inferTopologyFromName(g), 
-                    count: 0 
-                };
-            }
-
-            // 2. Use proper assessment like ModelConfig
-            let topo: MeshTopology = 'UNKNOWN';
-            
-            // First check the category property from global state (same as ModelConfig)
-            if (g.category !== undefined) {
-                const category = String(g.category).toUpperCase();
-                if (category === '3D' || category === '3') topo = 'VOLUME';
-                else if (category === '2D' || category === '2') topo = 'SURFACE';
-                else if (category === '1D' || category === '1') topo = 'WIRE';
-                else if (category === '0D' || category === '0') topo = 'NODE';
-            }
-            
-            // Use med_type mapping like ModelConfig
-            if (topo === 'UNKNOWN' && g.med_type) {
-                const medTypeBase = g.med_type.split('_')[0];
-                const medCategory = ELEMENT_TYPE_MAP[medTypeBase];
-                if (medCategory === '1D') topo = 'WIRE';
-                else if (medCategory === '2D') topo = 'SURFACE';
-                else if (medCategory === '3D') topo = 'VOLUME';
-                else if (medCategory === '0D') topo = 'NODE';
-            }
-            
-            // Fallback to other properties
-            if (topo === 'UNKNOWN') {
-                const dim = g.dimension ?? g.dim ?? g.type;
-                if (dim !== undefined) {
-                    const d = String(dim).toUpperCase();
-                    if (d === '3' || d === '3D' || d.includes('VOL')) topo = 'VOLUME';
-                    else if (d === '2' || d === '2D' || d.includes('SURF') || d.includes('FACE')) topo = 'SURFACE';
-                    else if (d === '1' || d === '1D' || d.includes('WIRE') || d.includes('EDGE') || d.includes('LINE')) topo = 'WIRE';
-                    else if (d === '0' || d === '0D' || d.includes('NOD') || d.includes('POINT')) topo = 'NODE';
-                }
-            } 
-            
-            // Final fallback to name-based inference
-            if (topo === 'UNKNOWN' && g.name) {
-                topo = inferTopologyFromName(g.name);
-            }
-
-            return { 
-                name: g.name || 'Unnamed_Group', 
-                topology: topo, 
-                count: g.count || g.nodeCount || 0 
+            const name = typeof g === 'string' ? g : g.name || 'Unnamed';
+            return {
+                name,
+                topology: inferTopologyFromName(name),
+                count: 0
             };
         });
-    }, [availableGroups]);
+    }, [meshGroups, availableGroups]);
 
     // Função auxiliar para inferência por nome (Fallback)
     function inferTopologyFromName(name: string): MeshTopology {
@@ -198,7 +171,7 @@ export default function RestrictionConfig({
 
     // Derived State
     const selected = useMemo(() => constraints.find(c => c.id === selectedId), [constraints, selectedId])
-    
+
     const compatibleGroups = useMemo(() => {
         if (!selected) return []
         const definition = CONSTRAINT_DEFS[selected.type]
@@ -208,14 +181,14 @@ export default function RestrictionConfig({
     // Physics Intelligence
     const physicsCheck = useMemo(() => {
         if (!selected) return { rotAllowed: true, warning: null }
-        
+
         const groupMeta = normalizedGroups.find(g => g.name === selected.targetGroup)
         if (!groupMeta) return { rotAllowed: true, warning: null }
 
         if (selected.type === 'DDL_IMPO' && groupMeta.topology === 'VOLUME') {
-            return { 
-                rotAllowed: false, 
-                warning: 'Volume elements (3D) do not support Rotational DOFs. Rotations auto-disabled.' 
+            return {
+                rotAllowed: false,
+                warning: 'Volume elements (3D) do not support Rotational DOFs. Rotations auto-disabled.'
             }
         }
         return { rotAllowed: true, warning: null }
@@ -225,7 +198,7 @@ export default function RestrictionConfig({
     const generatedCode = useMemo(() => {
         if (!selected) return '# Select a constraint'
         const args: string[] = []
-        
+
         if (selected.type === 'PRE_EPSI') {
             Object.entries(selected.strain_tensor).forEach(([k, v]) => {
                 if (v !== 0) args.push(`${k.toUpperCase()}=${v}`)
@@ -234,7 +207,7 @@ export default function RestrictionConfig({
             if (selected.dof_trans.x) args.push(`DX=${selected.values['DX'] || 0}`)
             if (selected.dof_trans.y) args.push(`DY=${selected.values['DY'] || 0}`)
             if (selected.dof_trans.z) args.push(`DZ=${selected.values['DZ'] || 0}`)
-            
+
             if (physicsCheck.rotAllowed) {
                 if (selected.dof_rot.x) args.push(`DRX=${selected.values['DRX'] || 0}`)
                 if (selected.dof_rot.y) args.push(`DRY=${selected.values['DRY'] || 0}`)
@@ -247,86 +220,99 @@ export default function RestrictionConfig({
 
         if (args.length === 0) return '# No active values'
 
-        return `${selected.name} = ${selected.type}(
-    GROUP_MA = '${selected.targetGroup}',
-    ${args.join(',\n    ')}
+        // Determine Group Type (MA vs NO)
+        const groupMeta = normalizedGroups.find(g => g.name === selected.targetGroup)
+        const groupKey = (groupMeta?.topology === 'NODE' || selected.targetGroup.toUpperCase().includes('NODE'))
+            ? 'GROUP_NO'
+            : 'GROUP_MA'
+
+        const keyword = selected.type
+
+        return `${selected.name} = AFFE_CHAR_MECA(
+    MODELE = MODELE,
+    ${keyword} = _F(
+        ${groupKey} = '${selected.targetGroup}',
+        ${args.join(',\n        ')}
+    ),
 );`
-    }, [selected, physicsCheck])
+    }, [selected, physicsCheck, normalizedGroups])
 
     // Propagate changes
     useEffect(() => {
-        if(onUpdate) onUpdate(constraints);
+        if (onUpdate) onUpdate(constraints);
     }, [constraints, onUpdate]);
-    
+
     // Generate and update restriction commands
     useEffect(() => {
         if (onRestrictionCommandsUpdate) {
+            const generateCommand = (c: KinematicConstraint) => {
+                const args: string[] = []
+
+                // DOF Translation
+                if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
+                if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
+                if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
+
+                // DOF Rotation
+                if (physicsCheck.rotAllowed) {
+                    if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
+                    if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
+                    if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
+                }
+
+                // Special DOFs
+                if (c.type === 'FACE_IMPO' && c.dnor) args.push(`DNOR=${c.values['DNOR'] || 0}`)
+                if (c.type === 'ARETE_IMPO' && c.dtan) args.push(`DTAN=${c.values['DTAN'] || 0}`)
+                if (c.type === 'PRE_EPSI') {
+                    Object.entries(c.strain_tensor).forEach(([k, v]) => {
+                        if (v !== 0) args.push(`${k.toUpperCase()}=${v}`)
+                    })
+                }
+
+                // Determine Group Type (MA vs NO)
+                const groupMeta = normalizedGroups.find(g => g.name === c.targetGroup)
+                const groupKey = (groupMeta?.topology === 'NODE' || c.targetGroup.toUpperCase().includes('NODE'))
+                    ? 'GROUP_NO'
+                    : 'GROUP_MA'
+
+                // Mapping ConstraintType to Aster Keyword
+                // DDL_IMPO is used for both DDL constraints and generic nodal constraints
+                // FACE_IMPO, ARETE_IMPO, PRE_EPSI map directly
+                const keyword = c.type
+
+                return `${c.name} = AFFE_CHAR_MECA(
+    MODELE = MODELE,
+    ${keyword} = _F(
+        ${groupKey} = '${c.targetGroup}',
+        ${args.join(', ')}
+    ),
+);`
+            }
+
             const ddlCommands = constraints
                 .filter(c => c.type === 'DDL_IMPO')
-                .map(c => {
-                    const args: string[] = []
-                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
-                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
-                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
-                    
-                    if (physicsCheck.rotAllowed) {
-                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
-                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
-                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
-                    }
-                    
-                    return `${c.name} = DDL_IMPO(
-    GROUP_MA = '${c.targetGroup}',
-    ${args.join(',\n    ')}
-);`
-                })
-            
+                .map(generateCommand)
+
             const faceCommands = constraints
                 .filter(c => c.type === 'FACE_IMPO')
-                .map(c => {
-                    const args: string[] = []
-                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
-                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
-                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
-                    
-                    if (physicsCheck.rotAllowed) {
-                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
-                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
-                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
-                    }
-                    
-                    if (c.dnor) args.push(`DNOR=${c.values['DNOR'] || 0}`)
-                    
-                    return `${c.name} = FACE_IMPO(
-    GROUP_MA = '${c.targetGroup}',
-    ${args.join(',\n    ')}
-);`
-                })
-            
+                .map(generateCommand)
+
             const edgeCommands = constraints
                 .filter(c => c.type === 'ARETE_IMPO')
-                .map(c => {
-                    const args: string[] = []
-                    if (c.dof_trans.x) args.push(`DX=${c.values['DX'] || 0}`)
-                    if (c.dof_trans.y) args.push(`DY=${c.values['DY'] || 0}`)
-                    if (c.dof_trans.z) args.push(`DZ=${c.values['DZ'] || 0}`)
-                    
-                    if (physicsCheck.rotAllowed) {
-                        if (c.dof_rot.x) args.push(`DRX=${c.values['DRX'] || 0}`)
-                        if (c.dof_rot.y) args.push(`DRY=${c.values['DRY'] || 0}`)
-                        if (c.dof_rot.z) args.push(`DRZ=${c.values['DRZ'] || 0}`)
-                    }
-                    
-                    if (c.dtan) args.push(`DTAN=${c.values['DTAN'] || 0}`)
-                    
-                    return `${c.name} = ARETE_IMPO(
-    GROUP_MA = '${c.targetGroup}',
-    ${args.join(',\n    ')}
-);`
-                })
-            
+                .map(generateCommand)
+
+            // PRE_EPSI commands (if any) could be handled similarly or added to a separate list if supported upstream
+            const strainCommands = constraints
+                .filter(c => c.type === 'PRE_EPSI')
+                .map(generateCommand)
+
+            // Merge PRE_EPSI into ddlCommands or handle separately depending on orchestrator?
+            // For now, let's keep them in ddlCommands as generic generic mechanical charges if no specific bucket exists,
+            // but the interface expects specific buckets. We'll add them to ddlCommands to ensure they are included.
+            const allGenericCommands = [...ddlCommands, ...strainCommands]
+
             onRestrictionCommandsUpdate({
-                ddlCommands,
+                ddlCommands: allGenericCommands,
                 faceCommands,
                 edgeCommands,
                 validation: {
@@ -336,7 +322,7 @@ export default function RestrictionConfig({
                 }
             })
         }
-    }, [constraints, onRestrictionCommandsUpdate, physicsCheck])
+    }, [constraints, onRestrictionCommandsUpdate, physicsCheck, normalizedGroups])
 
     // --- Actions ---
 
@@ -363,7 +349,7 @@ export default function RestrictionConfig({
 
     const update = (field: keyof KinematicConstraint, value: any) => {
         if (!selectedId) return
-        
+
         // Auto-rename duplicate constraint names
         if (field === 'name') {
             const newName = value.trim();
@@ -371,19 +357,19 @@ export default function RestrictionConfig({
                 .filter(c => c.id !== selectedId)
                 .map(c => c.name)
                 .filter(name => name.startsWith(newName));
-            
+
             if (existingNames.length > 0) {
                 // Find the highest suffix number
                 const suffixNumbers = existingNames.map(name => {
                     const match = name.match(/_(\d+)$/);
                     return match ? parseInt(match[1]) : 0;
                 });
-                
+
                 const maxSuffix = Math.max(...suffixNumbers, 0);
                 value = `${newName}_${maxSuffix + 1}`;
             }
         }
-        
+
         setConstraints(prev => prev.map(c => c.id === selectedId ? { ...c, [field]: value } : c))
     }
 
@@ -395,13 +381,13 @@ export default function RestrictionConfig({
 
     const applyPreset = (type: 'FIXED' | 'PINNED') => {
         if (!selectedId) return;
-        
+
         let newRot = { x: false, y: false, z: false };
         let newTrans = { x: true, y: true, z: true };
 
         if (type === 'FIXED' && physicsCheck.rotAllowed) {
             newRot = { x: true, y: true, z: true };
-        } 
+        }
 
         setConstraints(prev => prev.map(c => {
             if (c.id !== selectedId) return c;
@@ -426,7 +412,7 @@ export default function RestrictionConfig({
 
     return (
         <div className="flex h-full w-full bg-slate-950 text-slate-200 font-sans border border-slate-800">
-            
+
             {/* SIDEBAR */}
             <aside className="w-72 bg-slate-925 border-r border-slate-800 flex flex-col">
                 <div className="p-4 border-b border-slate-800">
@@ -442,7 +428,7 @@ export default function RestrictionConfig({
                                     className="flex flex-col items-center justify-center p-3 rounded bg-slate-900 border border-slate-800 hover:border-slate-600 hover:bg-slate-800 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Icon className={`w-5 h-5 mb-2 ${def.color}`} />
-                                    <span className="text-[9px] font-bold text-slate-400 group-hover:text-white">{key.replace('_IMPO','')}</span>
+                                    <span className="text-[9px] font-bold text-slate-400 group-hover:text-white">{key.replace('_IMPO', '')}</span>
                                 </button>
                             )
                         })}
@@ -452,20 +438,20 @@ export default function RestrictionConfig({
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {normalizedGroups.length === 0 && (
                         <div className="text-center p-4 text-[10px] text-slate-600 font-mono">
-                            No groups found.<br/>Load a mesh to start.
+                            No groups found.<br />Load a mesh to start.
                         </div>
                     )}
                     {constraints.map(c => {
                         const def = CONSTRAINT_DEFS[c.type]
                         const Icon = def.icon
                         return (
-                            <div 
+                            <div
                                 key={c.id}
                                 onClick={() => setSelectedId(c.id)}
                                 className={`
                                     group flex items-center justify-between p-3 rounded cursor-pointer border transition-all
-                                    ${selectedId === c.id 
-                                        ? 'bg-slate-800 border-slate-600 shadow-lg' 
+                                    ${selectedId === c.id
+                                        ? 'bg-slate-800 border-slate-600 shadow-lg'
                                         : 'bg-transparent border-transparent hover:bg-slate-900'}
                                 `}
                             >
@@ -478,8 +464,8 @@ export default function RestrictionConfig({
                                         <div className="text-[9px] font-mono text-slate-500">{c.type}</div>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); setConstraints(prev => prev.filter(x => x.id !== c.id))}}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setConstraints(prev => prev.filter(x => x.id !== c.id)) }}
                                     className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -496,45 +482,70 @@ export default function RestrictionConfig({
                     <>
                         <header className="h-20 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900/50">
                             <div className="flex items-center gap-4">
-                                <input 
-                                    value={selected.name}
-                                    onChange={(e) => update('name', e.target.value)}
-                                    className="bg-transparent text-xl font-bold focus:outline-none focus:border-b border-blue-500 w-64"
-                                />
-                                <div className="px-2 py-1 rounded bg-slate-800 text-[10px] font-mono text-slate-400 border border-slate-700">
-                                    {selected.type}
+                                <div className="flex flex-col">
+                                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Constraint Name</label>
+                                    <input
+                                        value={selected.name}
+                                        onChange={(e) => update('name', e.target.value)}
+                                        className="bg-transparent text-xl font-bold focus:outline-none focus:border-b-2 border-blue-500 w-64 transition-all"
+                                    />
                                 </div>
-                            </div>
-                            
-                            <div className="flex flex-col items-end">
-                                <label className="text-[9px] uppercase font-bold text-slate-500 mb-1">Applied to Group</label>
-                                <div className="relative">
-                                    <select 
-                                        value={selected.targetGroup}
-                                        onChange={(e) => update('targetGroup', e.target.value)}
-                                        className="bg-slate-900 border border-slate-700 text-xs text-white py-1.5 pl-3 pr-8 rounded focus:border-blue-500 outline-none w-64 appearance-none"
-                                    >
-                                        <option value="" disabled>Select Group...</option>
-                                        {compatibleGroups.length > 0 ? (
-                                            compatibleGroups.map(g => (
-                                                <option key={g.name} value={g.name}>
-                                                    {g.name} [{g.topology}]
-                                                </option>
-                                            ))
-                                        ) : (
-                                            <option disabled>No compatible groups found</option>
-                                        )}
-                                    </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Box className="w-3 h-3 text-slate-500" />
-                                    </div>
+                                <div className="mt-4 px-2 py-1 rounded bg-slate-800 text-[9px] font-black text-slate-300 border border-slate-700 uppercase tracking-[0.1em]">
+                                    {selected.type.replace('_IMPO', '')}
                                 </div>
                             </div>
                         </header>
 
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                             <div className="max-w-4xl mx-auto space-y-8">
-                                
+
+                                {/* SELEÇÃO DE GRUPOS (Relocated) */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-slate-400">
+                                            <Box className="w-4 h-4" />
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest">Target Mesh Group</h3>
+                                        </div>
+                                        {selected.targetGroup && (
+                                            <span className="text-[9px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                                Selected: {selected.targetGroup}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2 p-1">
+                                        {compatibleGroups.length > 0 ? (
+                                            compatibleGroups.map(g => {
+                                                const isSelected = selected.targetGroup === g.name;
+                                                const def = CONSTRAINT_DEFS[selected.type];
+
+                                                return (
+                                                    <button
+                                                        key={g.name}
+                                                        onClick={() => update('targetGroup', g.name)}
+                                                        className={`
+                                                            px-4 py-2 rounded text-[10px] font-mono border transition-all flex items-center gap-2
+                                                            ${isSelected
+                                                                ? `${def.bg} ${def.color} border-current shadow-[0_0_10px_rgba(37,99,235,0.1)] scale-[1.02]`
+                                                                : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300'
+                                                            }
+                                                        `}
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-current shadow-[0_0_5px_currentColor]' : 'bg-slate-800'}`} />
+                                                        {g.name}
+                                                        <span className="opacity-30 text-[8px] ml-1 font-sans">[{g.topology}]</span>
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="w-full text-[10px] text-orange-500 italic flex items-center gap-2 bg-orange-500/5 p-4 rounded border border-orange-500/20">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                No compatible mesh groups available for {selected.type}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* AVISO FÍSICO */}
                                 {physicsCheck.warning && (
                                     <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/20 rounded text-orange-200">
@@ -550,13 +561,13 @@ export default function RestrictionConfig({
                                 {(selected.type === 'DDL_IMPO' || selected.type === 'ARETE_IMPO' || selected.type === 'FACE_IMPO') && (
                                     <div className="flex items-center gap-4 border-b border-slate-800 pb-6">
                                         <span className="text-[10px] font-bold uppercase text-slate-500">Quick Presets:</span>
-                                        <button 
+                                        <button
                                             onClick={() => applyPreset('FIXED')}
                                             className="flex items-center gap-2 px-3 py-1.5 rounded bg-slate-900 border border-slate-700 hover:border-blue-500 hover:text-blue-400 text-xs font-bold transition-all"
                                         >
                                             <Anchor className="w-3 h-3" /> Fixed
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={() => applyPreset('PINNED')}
                                             className="flex items-center gap-2 px-3 py-1.5 rounded bg-slate-900 border border-slate-700 hover:border-emerald-500 hover:text-emerald-400 text-xs font-bold transition-all"
                                         >
@@ -576,15 +587,15 @@ export default function RestrictionConfig({
                                                     <h3 className="text-xs font-black uppercase tracking-widest">Translation</h3>
                                                 </div>
                                                 <div className="space-y-3">
-                                                    {(['x','y','z'] as const).map(axis => (
-                                                        <DofInput 
-                                                            key={axis} 
+                                                    {(['x', 'y', 'z'] as const).map(axis => (
+                                                        <DofInput
+                                                            key={axis}
                                                             label={`D${axis.toUpperCase()}`}
                                                             checked={selected.dof_trans[axis]}
                                                             onToggle={(v) => updateDeep('dof_trans', axis, v)}
                                                             value={selected.values[`D${axis.toUpperCase()}`] || 0}
                                                             onValueChange={(v) => {
-                                                                const newValues = {...selected.values, [`D${axis.toUpperCase()}`]: v}
+                                                                const newValues = { ...selected.values, [`D${axis.toUpperCase()}`]: v }
                                                                 update('values', newValues)
                                                             }}
                                                         />
@@ -599,15 +610,15 @@ export default function RestrictionConfig({
                                                     <h3 className="text-xs font-black uppercase tracking-widest">Rotation</h3>
                                                 </div>
                                                 <div className="space-y-3">
-                                                    {(['x','y','z'] as const).map(axis => (
-                                                        <DofInput 
-                                                            key={axis} 
+                                                    {(['x', 'y', 'z'] as const).map(axis => (
+                                                        <DofInput
+                                                            key={axis}
                                                             label={`DR${axis.toUpperCase()}`}
                                                             checked={selected.dof_rot[axis]}
                                                             onToggle={(v) => updateDeep('dof_rot', axis, v)}
                                                             value={selected.values[`DR${axis.toUpperCase()}`] || 0}
                                                             onValueChange={(v) => {
-                                                                const newValues = {...selected.values, [`DR${axis.toUpperCase()}`]: v}
+                                                                const newValues = { ...selected.values, [`DR${axis.toUpperCase()}`]: v }
                                                                 update('values', newValues)
                                                             }}
                                                         />
@@ -629,19 +640,19 @@ export default function RestrictionConfig({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 checked={selected.dnor}
                                                 onChange={(e) => update('dnor', e.target.checked)}
                                                 className="toggle toggle-sm accent-purple-500"
                                             />
                                             {selected.dnor && (
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     className="w-24 bg-slate-950 border border-purple-500/50 rounded px-2 py-1 text-xs font-mono"
                                                     value={selected.values['DNOR'] || 0}
                                                     onChange={(e) => {
-                                                        const newValues = {...selected.values, 'DNOR': e.target.value}
+                                                        const newValues = { ...selected.values, 'DNOR': e.target.value }
                                                         update('values', newValues)
                                                     }}
                                                 />
@@ -660,19 +671,19 @@ export default function RestrictionConfig({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 checked={selected.dtan}
                                                 onChange={(e) => update('dtan', e.target.checked)}
                                                 className="accent-emerald-500"
                                             />
                                             {selected.dtan && (
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     className="w-24 bg-slate-950 border border-emerald-500/50 rounded px-2 py-1 text-xs font-mono"
                                                     value={selected.values['DTAN'] || 0}
                                                     onChange={(e) => {
-                                                        const newValues = {...selected.values, 'DTAN': e.target.value}
+                                                        const newValues = { ...selected.values, 'DTAN': e.target.value }
                                                         update('values', newValues)
                                                     }}
                                                 />
@@ -691,7 +702,7 @@ export default function RestrictionConfig({
                                             {Object.keys(selected.strain_tensor).map(comp => (
                                                 <div key={comp} className="flex flex-col gap-1">
                                                     <label className="text-[10px] font-mono uppercase text-slate-500">{comp}</label>
-                                                    <input 
+                                                    <input
                                                         type="number"
                                                         step="0.001"
                                                         className="bg-slate-900 border border-slate-700 rounded p-2 text-xs font-mono focus:border-amber-500 outline-none"
@@ -710,7 +721,7 @@ export default function RestrictionConfig({
 
                                 {/* CODE PREVIEW RETRÁTIL */}
                                 <div className="border-t border-slate-800 mt-4">
-                                    <button 
+                                    <button
                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                     >
@@ -720,7 +731,7 @@ export default function RestrictionConfig({
                                         </div>
                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                     </button>
-                                    
+
                                     {isCodeOpen && (
                                         <div className="relative group">
                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -757,8 +768,8 @@ function DofInput({ label, checked, onToggle, value, onValueChange }: {
             <button
                 onClick={() => onToggle(!checked)}
                 className={`w-12 h-8 rounded flex items-center justify-center text-[10px] font-black transition-all border
-                    ${checked 
-                        ? 'bg-blue-600 border-blue-500 text-white' 
+                    ${checked
+                        ? 'bg-blue-600 border-blue-500 text-white'
                         : 'bg-slate-950 border-slate-700 text-slate-500 hover:border-slate-500'}
                 `}
             >
@@ -766,8 +777,8 @@ function DofInput({ label, checked, onToggle, value, onValueChange }: {
             </button>
             <div className={`flex-1 h-8 bg-slate-950 border border-slate-800 rounded flex items-center px-3 transition-opacity ${checked ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
                 <span className="text-[10px] text-slate-500 font-mono mr-2">=</span>
-                <input 
-                    type="text" 
+                <input
+                    type="text"
                     value={value}
                     onChange={(e) => onValueChange(e.target.value)}
                     className="bg-transparent w-full text-xs font-mono focus:outline-none text-white placeholder-slate-700"

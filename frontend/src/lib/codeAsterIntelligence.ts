@@ -8,7 +8,7 @@
 
 export const LoadType = {
     FORCE_NODALE: 'FORCE_NODALE',
-    FORCE_ARETE: 'FORCE_ARETE', 
+    FORCE_ARETE: 'FORCE_ARETE',
     FORCE_FACE: 'FORCE_FACE',
     PRES_REP: 'PRES_REP',
     PESANTEUR: 'PESANTEUR'
@@ -18,7 +18,7 @@ export type LoadType = typeof LoadType[keyof typeof LoadType]
 
 export const MeshTopology = {
     NODE: 'NODE',
-    WIRE: 'WIRE', 
+    WIRE: 'WIRE',
     SURFACE: 'SURFACE',
     VOLUME: 'VOLUME'
 } as const
@@ -75,21 +75,21 @@ export interface LoadParameters {
 export class CodeAsterIntelligence {
     private static instance: CodeAsterIntelligence
     private loadDefinitions: Map<LoadType, LoadDefinition>
-    
+
     private constructor() {
         this.loadDefinitions = this.initializeLoadDefinitions()
     }
-    
+
     public static getInstance(): CodeAsterIntelligence {
         if (!CodeAsterIntelligence.instance) {
             CodeAsterIntelligence.instance = new CodeAsterIntelligence()
         }
         return CodeAsterIntelligence.instance
     }
-    
+
     private initializeLoadDefinitions(): Map<LoadType, LoadDefinition> {
         const definitions = new Map<LoadType, LoadDefinition>()
-        
+
         // FORCE_NODALE Definition
         definitions.set(LoadType.FORCE_NODALE, {
             loadType: LoadType.FORCE_NODALE,
@@ -106,7 +106,7 @@ export class CodeAsterIntelligence {
                     unit: 'N'
                 },
                 {
-                    name: 'FY', 
+                    name: 'FY',
                     required: false,
                     typeHint: 'float',
                     description: 'Force component in Y direction',
@@ -114,7 +114,7 @@ export class CodeAsterIntelligence {
                 },
                 {
                     name: 'FZ',
-                    required: false, 
+                    required: false,
                     typeHint: 'float',
                     description: 'Force component in Z direction',
                     unit: 'N'
@@ -129,7 +129,7 @@ export class CodeAsterIntelligence {
                 {
                     name: 'MY',
                     required: false,
-                    typeHint: 'float', 
+                    typeHint: 'float',
                     description: 'Moment component about Y axis',
                     unit: 'N.m'
                 },
@@ -154,7 +154,7 @@ export class CodeAsterIntelligence {
                 'FX = 1000.0, MY = 50.0'
             ]
         })
-        
+
         // FORCE_ARETE Definition  
         definitions.set(LoadType.FORCE_ARETE, {
             loadType: LoadType.FORCE_ARETE,
@@ -172,7 +172,7 @@ export class CodeAsterIntelligence {
                 },
                 {
                     name: 'FY',
-                    required: false, 
+                    required: false,
                     typeHint: 'float',
                     description: 'Linear force density in Y direction',
                     unit: 'N/m'
@@ -181,7 +181,7 @@ export class CodeAsterIntelligence {
                     name: 'FZ',
                     required: false,
                     typeHint: 'float',
-                    description: 'Linear force density in Z direction', 
+                    description: 'Linear force density in Z direction',
                     unit: 'N/m'
                 },
                 {
@@ -193,7 +193,7 @@ export class CodeAsterIntelligence {
                 },
                 {
                     name: 'MY',
-                    required: false, 
+                    required: false,
                     typeHint: 'float',
                     description: 'Linear moment density about Y axis',
                     unit: 'N·m/m'
@@ -202,7 +202,7 @@ export class CodeAsterIntelligence {
                     name: 'MZ',
                     required: false,
                     typeHint: 'float',
-                    description: 'Linear moment density about Z axis', 
+                    description: 'Linear moment density about Z axis',
                     unit: 'N·m/m'
                 }
             ],
@@ -218,7 +218,7 @@ export class CodeAsterIntelligence {
                 'FY = -50.0, FZ = 25.0'
             ]
         })
-        
+
         // FORCE_FACE Definition
         definitions.set(LoadType.FORCE_FACE, {
             loadType: LoadType.FORCE_FACE,
@@ -261,7 +261,7 @@ export class CodeAsterIntelligence {
                 'FX = 500.0, FY = -300.0'
             ]
         })
-        
+
         // PRES_REP Definition
         definitions.set(LoadType.PRES_REP, {
             loadType: LoadType.PRES_REP,
@@ -292,7 +292,7 @@ export class CodeAsterIntelligence {
                 'PRES = 50000.0'
             ]
         })
-        
+
         // PESANTEUR Definition
         definitions.set(LoadType.PESANTEUR, {
             loadType: LoadType.PESANTEUR,
@@ -330,29 +330,29 @@ export class CodeAsterIntelligence {
                 'GRAVITE = 1.62, DIRECTION = (0, 0, -1)'
             ]
         })
-        
+
         return definitions
     }
-    
+
     // --- Public API Methods ---
-    
+
     public validateLoadParameters(loadType: LoadType, parameters: LoadParameters): ValidationResult {
         const errors: string[] = []
         const warnings: string[] = []
-        
+
         const definition = this.loadDefinitions.get(loadType)
         if (!definition) {
             errors.push(`Unknown load type: ${loadType}`)
             return { isValid: false, errors, warnings }
         }
-        
+
         // Check required parameters
         for (const rule of definition.parameterRules) {
             if (rule.required && !(rule.name in parameters)) {
                 errors.push(`Required parameter '${rule.name}' is missing`)
             } else if (rule.name in parameters) {
                 const value = parameters[rule.name]
-                
+
                 // Type validation
                 if (rule.typeHint === 'float') {
                     const numValue = Number(value)
@@ -360,7 +360,7 @@ export class CodeAsterIntelligence {
                         errors.push(`${rule.name} must be a numeric value`)
                     } else {
                         parameters[rule.name] = numValue // Normalize to number
-                        
+
                         // Range validation
                         if (rule.minValue !== undefined && numValue < rule.minValue) {
                             errors.push(`${rule.name} must be >= ${rule.minValue}`)
@@ -383,27 +383,27 @@ export class CodeAsterIntelligence {
                 }
             }
         }
-        
+
         // Load-specific validation
         if (loadType === LoadType.FORCE_NODALE || loadType === LoadType.FORCE_ARETE || loadType === LoadType.FORCE_FACE) {
             const hasForce = ['FX', 'FY', 'FZ'].some(param => param in parameters && parameters[param] !== 0)
             const hasMoment = ['MX', 'MY', 'MZ'].some(param => param in parameters && parameters[param] !== 0)
-            
+
             if (!hasForce && !hasMoment) {
                 warnings.push('No force or moment components specified. Load will have no effect.')
             }
         }
-        
+
         return {
             isValid: errors.length === 0,
             errors,
             warnings
         }
     }
-    
+
     public generateCommandSyntax(
-        loadType: LoadType, 
-        parameters: LoadParameters, 
+        loadType: LoadType,
+        parameters: LoadParameters,
         targetGroup: string = '',
         resultName: string = 'load_1'
     ): CommandStructure {
@@ -417,22 +417,22 @@ export class CodeAsterIntelligence {
                 errors: validation.errors
             }
         }
-        
+
         const definition = this.loadDefinitions.get(loadType)!
         const args: string[] = []
-        
+
         // Add MODELE (always required for AFFE_CHAR_MECA)
-        args.push('MODELE = modele')
-        
+        args.push('MODELE = MODELE')
+
         // Add group specification
         if (targetGroup || loadType !== LoadType.PESANTEUR) {
             const groupKey = definition.groupPrefix
             args.push(`${groupKey} = '${targetGroup}'`)
         }
-        
+
         // Add load-specific parameters
         const loadParams: string[] = []
-        
+
         for (const rule of definition.parameterRules) {
             if (rule.name in parameters) {
                 const value = parameters[rule.name]
@@ -444,12 +444,12 @@ export class CodeAsterIntelligence {
                 }
             }
         }
-        
+
         // Add the load block
         if (loadParams.length > 0) {
             args.push(`${loadType} = _F(\n    ${loadParams.join(',\n    ')}\n)`)
         }
-        
+
         // Add optional AFFE_CHAR_MECA parameters from the parameters object
         const optionalParams = {
             'DOUBLE_LAGRANGE': parameters.DOUBLE_LAGRANGE || '\'NON\'',
@@ -457,7 +457,7 @@ export class CodeAsterIntelligence {
             'VERI_NORM': parameters.VERI_NORM || '\'NON\'',
             'VERI_AFFE': parameters.VERI_AFFE || '\'NON\''
         }
-        
+
         // Only add optional parameters that are different from defaults or explicitly set
         if (optionalParams.DOUBLE_LAGRANGE !== '\'NON\'') {
             args.push(`DOUBLE_LAGRANGE = ${optionalParams.DOUBLE_LAGRANGE}`)
@@ -471,10 +471,10 @@ export class CodeAsterIntelligence {
         if (optionalParams.VERI_AFFE !== '\'NON\'') {
             args.push(`VERI_AFFE = ${optionalParams.VERI_AFFE}`)
         }
-        
+
         // Generate final command
         const command = `${resultName} = AFFE_CHAR_MECA(\n    ${args.join(',\n    ')}\n);`
-        
+
         return {
             status: 'success',
             loadType: loadType,
@@ -487,20 +487,20 @@ export class CodeAsterIntelligence {
             }
         }
     }
-    
+
     public getLoadDefinition(loadType: LoadType): LoadDefinition | undefined {
         return this.loadDefinitions.get(loadType)
     }
-    
+
     public getAllLoadDefinitions(): LoadDefinition[] {
         return Array.from(this.loadDefinitions.values())
     }
-    
+
     public getValidationHints(loadType: LoadType): string[] {
         const definition = this.loadDefinitions.get(loadType)
         return definition?.validationHints || []
     }
-    
+
     public getSyntaxHelp(): Record<string, any> {
         return {
             affe_char_meca: {
@@ -515,7 +515,7 @@ export class CodeAsterIntelligence {
                 },
                 load_types: {
                     'FORCE_NODALE': 'Point loads on nodes',
-                    'FORCE_ARETE': 'Linear loads on edges', 
+                    'FORCE_ARETE': 'Linear loads on edges',
                     'FORCE_FACE': 'Surface traction on faces',
                     'PRES_REP': 'Normal pressure',
                     'PESANTEUR': 'Gravity field'

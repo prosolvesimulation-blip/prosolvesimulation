@@ -66,7 +66,7 @@ interface AdvancedParamsProps {
 
 const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onChange }) => {
     const [isExpanded, setIsExpanded] = useState(false)
-    
+
     // Map load types to Code_Aster types
     const loadTypeMap = {
         'gravity': 'PESANTEUR',
@@ -75,14 +75,14 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
         'face_force': 'FORCE_FACE',
         'edge_force': 'FORCE_ARETE'
     } as const
-    
+
     const asterLoadType = loadTypeMap[loadType] as any
     const definition = codeAsterIntelligence.getLoadDefinition(asterLoadType)
-    
+
     if (!definition?.optionalParams || definition.optionalParams.length === 0) {
         return null
     }
-    
+
     const optionalParamDefs = [
         {
             asterKeyword: 'DOUBLE_LAGRANGE',
@@ -121,7 +121,7 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
             optionLabels: { 'OUI': 'Enabled', 'NON': 'Disabled' } as Record<string, string>
         }
     ].filter(param => definition.optionalParams.includes(param.asterKeyword))
-    
+
     return (
         <div className="mt-6">
             <button
@@ -136,13 +136,13 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
                 </div>
                 <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {isExpanded && (
                 <div className="mt-3 p-4 bg-slate-900/30 border border-slate-800 rounded-lg space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                         {optionalParamDefs.map((def) => {
                             const value = params[def.asterKeyword] ?? def.default
-                            
+
                             return (
                                 <div key={def.asterKeyword} className="space-y-2 group">
                                     <div className="flex items-center justify-between">
@@ -161,7 +161,7 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         {def.type === 'select' && (
                                             <div className="relative">
@@ -179,14 +179,14 @@ const AdvancedParams: React.FC<AdvancedParamsProps> = ({ loadType, params, onCha
                                                 <ChevronDown size={10} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                                             </div>
                                         )}
-                                        
+
                                         {def.type === 'toggle' && (
                                             <button
                                                 onClick={() => onChange(def.asterKeyword, value === 'OUI' ? 'NON' : 'OUI')}
                                                 className={`
                                                     w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all border
-                                                    ${value === 'OUI' 
-                                                        ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20' 
+                                                    ${value === 'OUI'
+                                                        ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
                                                         : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-400'
                                                     }
                                                 `}
@@ -228,31 +228,31 @@ export default function LoadConfig({
     const getGroupCategory = (groupName: string): string => {
         console.log(`Getting category for group: ${groupName}`)
         console.log(`Available meshGroups:`, meshGroups)
-        
+
         if (!meshGroups) {
             console.log('No meshGroups available, returning Unknown')
             return 'Unknown'
         }
-        
+
         for (const [, groupsInFile] of Object.entries(meshGroups)) {
             const groups = groupsInFile as Record<string, any>
             const groupInfo = groups[groupName]
             console.log(`Looking for ${groupName} in groups:`, Object.keys(groups))
-            
+
             if (groupInfo) {
                 console.log(`Found group info for ${groupName}:`, groupInfo)
-                
+
                 // Use category if available, otherwise detect from types
                 if (groupInfo.category) {
                     console.log(`Using predefined category: ${groupInfo.category}`)
                     return groupInfo.category
                 }
-                
+
                 // Detect category from element types
                 const types = groupInfo.types || {}
                 const elementTypes = Object.keys(types)
                 console.log(`Element types for ${groupName}:`, elementTypes)
-                
+
                 if (elementTypes.some(t => t.includes('HEXA') || t.includes('TETRA') || t.includes('PENTA'))) {
                     console.log(`Detected 3D category for ${groupName}`)
                     return '3D'
@@ -271,7 +271,7 @@ export default function LoadConfig({
                 }
             }
         }
-        
+
         console.log(`Could not determine category for ${groupName}, returning Unknown`)
         return 'Unknown'
     }
@@ -284,36 +284,36 @@ export default function LoadConfig({
                 console.log(`Excluding ${groupName} from ${loadType} loads`)
                 return false
             }
-            
+
             const category = getGroupCategory(groupName)
             console.log(`Group ${groupName} has category ${category} for ${loadType} load`)
-            
+
             // For force loads: only nodal groups (Node only, not 1D)
             if (loadType === 'force') {
                 const isValid = category === 'Node'
                 console.log(`Force load: ${groupName} (${category}) -> ${isValid ? 'INCLUDED' : 'EXCLUDED'}`)
                 return isValid
             }
-            
+
             // For pressure loads: only surface groups (2D)
             if (loadType === 'pressure' || loadType === 'face_force') {
                 const isValid = category === '2D'
                 console.log(`${loadType} load: ${groupName} (${category}) -> ${isValid ? 'INCLUDED' : 'EXCLUDED'}`)
                 return isValid
             }
-            
+
             // For edge force loads: only edge groups (1D)
             if (loadType === 'edge_force') {
                 const isValid = category === '1D'
                 console.log(`Edge force load: ${groupName} (${category}) -> ${isValid ? 'INCLUDED' : 'EXCLUDED'}`)
                 return isValid
             }
-            
+
             // For gravity loads: all groups except _FULL_MESH (already filtered above)
             console.log(`Gravity load: ${groupName} (${category}) -> INCLUDED`)
             return true
         })
-        
+
         console.log(`Final filtered groups for ${loadType}:`, filtered)
         return filtered
     }
@@ -336,11 +336,11 @@ export default function LoadConfig({
                     'face_force': 'FORCE_FACE',
                     'edge_force': 'FORCE_ARETE'
                 } as const
-                
+
                 const asterLoadType = loadTypeMap[type] as any
                 const definition = codeAsterIntelligence.getLoadDefinition(asterLoadType)
                 const defaultOptionalParams: Record<string, any> = {}
-                
+
                 if (definition?.optionalParams) {
                     definition.optionalParams.forEach(param => {
                         switch (param) {
@@ -406,12 +406,12 @@ export default function LoadConfig({
                         direction: [parseFloat(l.ax || '0'), parseFloat(l.ay || '0'), parseFloat(l.az || '-1')],
                         gravite: parseFloat(l.intensity || '9.81')
                     }
-                    
+
                     // Only include group if not applying to whole model and group is selected
                     if (!l.applyToWholeModel && l.group) {
                         result.group = String(l.group)
                     }
-                    
+
                     return result
                 } else if (l.type === 'force') {
                     return {
@@ -460,7 +460,7 @@ export default function LoadConfig({
             }
         }
     }, [loads, onUpdate])
-    
+
     // Generate and update load commands
     useEffect(() => {
         if (onLoadCommandsUpdate) {
@@ -472,28 +472,30 @@ export default function LoadConfig({
                         FY: parseFloat(l.fy || '0'),
                         FZ: parseFloat(l.fz || '0')
                     }
-                    return codeAsterIntelligence.generateCommandSyntax(
+                    const result = codeAsterIntelligence.generateCommandSyntax(
                         'FORCE_NODALE',
                         parameters,
                         l.group || '',
-                        undefined
+                        l.name
                     )
+                    return result.command || ''
                 })
-            
+
             const pressureCommands = loads
                 .filter(l => l.type === 'pressure')
                 .map(l => {
                     const parameters = {
-                        PRES: parseFloat(l.intensity || '0')
+                        PRES: parseFloat(l.pressure || '0')
                     }
-                    return codeAsterIntelligence.generateCommandSyntax(
+                    const result = codeAsterIntelligence.generateCommandSyntax(
                         'PRES_REP',
                         parameters,
                         l.group || '',
-                        undefined
+                        l.name
                     )
+                    return result.command || ''
                 })
-            
+
             const gravityCommands = loads
                 .filter(l => l.type === 'gravity')
                 .map(l => {
@@ -501,14 +503,15 @@ export default function LoadConfig({
                         GRAVITE: parseFloat(l.intensity || '9.81'),
                         DIRECTION: [parseFloat(l.ax || '0'), parseFloat(l.ay || '0'), parseFloat(l.az || '-1')]
                     }
-                    return codeAsterIntelligence.generateCommandSyntax(
+                    const result = codeAsterIntelligence.generateCommandSyntax(
                         'PESANTEUR',
                         parameters,
                         '', // Gravity applies to whole model
-                        undefined
+                        l.name
                     )
+                    return result.command || ''
                 })
-            
+
             onLoadCommandsUpdate({
                 forceCommands,
                 pressureCommands,
@@ -521,7 +524,7 @@ export default function LoadConfig({
     const addItem = (type: 'gravity' | 'force' | 'pressure' | 'face_force' | 'edge_force') => {
         const newId = (loads.length + 1).toString()
         const suffix = type === 'gravity' ? 'ACCEL' : type === 'force' ? 'LOAD' : type === 'face_force' ? 'FACE' : type === 'edge_force' ? 'EDGE' : 'PRESS'
-        
+
         // Get default optional parameters from Code_Aster intelligence
         const loadTypeMap = {
             'gravity': 'PESANTEUR',
@@ -530,11 +533,11 @@ export default function LoadConfig({
             'face_force': 'FORCE_FACE',
             'edge_force': 'FORCE_ARETE'
         } as const
-        
+
         const asterLoadType = loadTypeMap[type] as any
         const definition = codeAsterIntelligence.getLoadDefinition(asterLoadType)
         const defaultOptionalParams: Record<string, any> = {}
-        
+
         if (definition?.optionalParams) {
             definition.optionalParams.forEach(param => {
                 switch (param) {
@@ -555,7 +558,7 @@ export default function LoadConfig({
                 }
             })
         }
-        
+
         const newItem: Load = {
             id: newId,
             name: `${suffix}_${newId}`,
@@ -579,7 +582,7 @@ export default function LoadConfig({
     const updateItem = (id: string, field: keyof Load, value: any) => {
         setLoads(loads.map(l => (l.id === id ? { ...l, [field]: value } : l)))
     }
-    
+
     const updateOptionalParam = (id: string, param: string, value: any) => {
         console.log('Updating optional param:', { id, param, value })
         setLoads(loads.map(l => {
@@ -599,7 +602,7 @@ export default function LoadConfig({
     // Code_Aster Intelligence: Real-time Code Generation & Validation
     const generatedCode = useMemo(() => {
         if (!selected) return '# Select a load to preview Code_Aster command'
-        
+
         const loadTypeMap = {
             'gravity': 'PESANTEUR',
             'force': 'FORCE_NODALE',
@@ -607,25 +610,25 @@ export default function LoadConfig({
             'face_force': 'FORCE_FACE',
             'edge_force': 'FORCE_ARETE'
         } as const
-        
+
         const asterLoadType = loadTypeMap[selected.type] as any
         if (!asterLoadType) return '# Unknown load type'
-        
+
         // Convert UI values to Code_Aster parameters
         const parameters: LoadParameters = {}
-        
+
         if (selected.type === 'gravity') {
             parameters.GRAVITE = parseFloat(selected.intensity || '9.81')
             parameters.DIRECTION = [
                 parseFloat(selected.ax || '0'),
-                parseFloat(selected.ay || '0'), 
+                parseFloat(selected.ay || '0'),
                 parseFloat(selected.az || '-1')
             ]
         } else if (selected.type === 'force') {
             const fx = parseFloat(selected.fx || '0')
             const fy = parseFloat(selected.fy || '0')
             const fz = parseFloat(selected.fz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -635,7 +638,7 @@ export default function LoadConfig({
             const fx = parseFloat(selected.fx || '0')
             const fy = parseFloat(selected.fy || '0')
             const fz = parseFloat(selected.fz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -646,7 +649,7 @@ export default function LoadConfig({
             const mx = parseFloat(selected.mx || '0')
             const my = parseFloat(selected.my || '0')
             const mz = parseFloat(selected.mz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -654,7 +657,7 @@ export default function LoadConfig({
             if (my !== 0) parameters.MY = my
             if (mz !== 0) parameters.MZ = mz
         }
-        
+
         // Add optional parameters to the main parameters object
         const optionalParams = selected.optionalParams || {}
         if (optionalParams.DOUBLE_LAGRANGE) {
@@ -669,7 +672,7 @@ export default function LoadConfig({
         if (optionalParams.VERI_AFFE) {
             parameters.VERI_AFFE = optionalParams.VERI_AFFE
         }
-        
+
         // Generate command using Code_Aster intelligence
         const result = codeAsterIntelligence.generateCommandSyntax(
             asterLoadType,
@@ -677,18 +680,18 @@ export default function LoadConfig({
             selected.type === 'gravity' && selected.applyToWholeModel ? '' : (selected.group || ''),
             selected.name
         )
-        
+
         if (result.status === 'error') {
             return `// Error: ${result.errors?.join(', ')}`
         }
-        
+
         return result.command || '# Command generation failed'
     }, [selected, selected?.fx, selected?.fy, selected?.fz, selected?.mx, selected?.my, selected?.mz, selected?.fnorm, selected?.ftan])
 
     // Real-time validation using Code_Aster intelligence
     const validationResult = useMemo((): ValidationResult => {
         if (!selected) return { isValid: true, errors: [], warnings: [] }
-        
+
         // Map UI load type to Code_Aster load type
         const loadTypeMap = {
             'gravity': 'PESANTEUR',
@@ -697,13 +700,13 @@ export default function LoadConfig({
             'face_force': 'FORCE_FACE',
             'edge_force': 'FORCE_ARETE'
         } as const
-        
+
         const asterLoadType = loadTypeMap[selected.type] as any
         if (!asterLoadType) return { isValid: false, errors: ['Unknown load type'], warnings: [] }
-        
+
         // Convert UI values to Code_Aster parameters
         const parameters: LoadParameters = {}
-        
+
         if (selected.type === 'gravity') {
             parameters.GRAVITE = parseFloat(selected.intensity || '9.81')
             parameters.DIRECTION = [
@@ -715,7 +718,7 @@ export default function LoadConfig({
             const fx = parseFloat(selected.fx || '0')
             const fy = parseFloat(selected.fy || '0')
             const fz = parseFloat(selected.fz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -725,7 +728,7 @@ export default function LoadConfig({
             const fx = parseFloat(selected.fx || '0')
             const fy = parseFloat(selected.fy || '0')
             const fz = parseFloat(selected.fz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -736,7 +739,7 @@ export default function LoadConfig({
             const mx = parseFloat(selected.mx || '0')
             const my = parseFloat(selected.my || '0')
             const mz = parseFloat(selected.mz || '0')
-            
+
             if (fx !== 0) parameters.FX = fx
             if (fy !== 0) parameters.FY = fy
             if (fz !== 0) parameters.FZ = fz
@@ -744,7 +747,7 @@ export default function LoadConfig({
             if (my !== 0) parameters.MY = my
             if (mz !== 0) parameters.MZ = mz
         }
-        
+
         return codeAsterIntelligence.validateLoadParameters(asterLoadType, parameters)
     }, [selected])
 
@@ -801,7 +804,7 @@ export default function LoadConfig({
                                     </div>
                                     <div className="flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase">
                                         <span className="truncate max-w-[150px]">
-                                            {l.type === 'gravity' 
+                                            {l.type === 'gravity'
                                                 ? (l.applyToWholeModel ? 'WHOLE_MODEL' : (l.group || 'NONE'))
                                                 : (l.group || 'GLOBAL')
                                             }
@@ -879,17 +882,17 @@ export default function LoadConfig({
                                                         />
                                                     ))}
                                                 </div>
-                                                
+
                                                 {/* Advanced Parameters */}
                                                 <AdvancedParams
                                                     loadType={selected.type}
                                                     params={selected.optionalParams || {}}
                                                     onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
                                                 />
-                                                
+
                                                 {/* Aster Command Preview */}
                                                 <div className="border-t border-slate-800 mt-8">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                                     >
@@ -899,11 +902,11 @@ export default function LoadConfig({
                                                         </div>
                                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                                     </button>
-                                                    
+
                                                     {isCodeOpen && (
                                                         <div className="relative group">
                                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => navigator.clipboard.writeText(generatedCode)}
                                                                     className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
                                                                 >
@@ -917,20 +920,19 @@ export default function LoadConfig({
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Groups Sidebar Column */}
                                             <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
                                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Application_Scope</span>
-                                                
+
                                                 {/* Whole Model Toggle */}
                                                 <div className="mb-4">
                                                     <button
                                                         onClick={() => updateItem(selected.id, 'applyToWholeModel', true)}
-                                                        className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left mb-2 ${
-                                                            selected.applyToWholeModel
-                                                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                        }`}
+                                                        className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left mb-2 ${selected.applyToWholeModel
+                                                            ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                            }`}
                                                     >
                                                         Whole Model (Default)
                                                     </button>
@@ -938,31 +940,29 @@ export default function LoadConfig({
                                                         Applies to entire model
                                                     </div>
                                                 </div>
-                                                
+
                                                 {/* Group Selection */}
                                                 <div>
                                                     <button
                                                         onClick={() => updateItem(selected.id, 'applyToWholeModel', false)}
-                                                        className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left mb-2 ${
-                                                            !selected.applyToWholeModel
-                                                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                        }`}
+                                                        className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left mb-2 ${!selected.applyToWholeModel
+                                                            ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                            }`}
                                                     >
                                                         Specific Group
                                                     </button>
-                                                    
+
                                                     {!selected.applyToWholeModel && (
                                                         <div className="space-y-1">
                                                             {getFilteredGroups('gravity').map(g => (
                                                                 <button
                                                                     key={g}
                                                                     onClick={() => updateItem(selected.id, 'group', g)}
-                                                                    className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
-                                                                        selected.group === g
-                                                                            ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                                                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                                    }`}
+                                                                    className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${selected.group === g
+                                                                        ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                                        }`}
                                                                 >
                                                                     {g}
                                                                 </button>
@@ -990,17 +990,17 @@ export default function LoadConfig({
                                                         />
                                                     ))}
                                                 </div>
-                                                
+
                                                 {/* Advanced Parameters */}
                                                 <AdvancedParams
                                                     loadType={selected.type}
                                                     params={selected.optionalParams || {}}
                                                     onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
                                                 />
-                                                
+
                                                 {/* Aster Command Preview */}
                                                 <div className="border-t border-slate-800 mt-8">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                                     >
@@ -1010,11 +1010,11 @@ export default function LoadConfig({
                                                         </div>
                                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                                     </button>
-                                                    
+
                                                     {isCodeOpen && (
                                                         <div className="relative group">
                                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => navigator.clipboard.writeText(generatedCode)}
                                                                     className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
                                                                 >
@@ -1028,7 +1028,7 @@ export default function LoadConfig({
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Groups Sidebar Column */}
                                             <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
                                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Target_Boundary_Group</span>
@@ -1037,11 +1037,10 @@ export default function LoadConfig({
                                                         <button
                                                             key={g}
                                                             onClick={() => updateItem(selected.id, 'group', g)}
-                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
-                                                                selected.group === g
-                                                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                            }`}
+                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${selected.group === g
+                                                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                                }`}
                                                         >
                                                             {g}
                                                         </button>
@@ -1065,17 +1064,17 @@ export default function LoadConfig({
                                                         fullWidth
                                                     />
                                                 </div>
-                                                
+
                                                 {/* Advanced Parameters */}
                                                 <AdvancedParams
                                                     loadType={selected.type}
                                                     params={selected.optionalParams || {}}
                                                     onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
                                                 />
-                                                
+
                                                 {/* Aster Command Preview */}
                                                 <div className="border-t border-slate-800 mt-8">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                                     >
@@ -1085,11 +1084,11 @@ export default function LoadConfig({
                                                         </div>
                                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                                     </button>
-                                                    
+
                                                     {isCodeOpen && (
                                                         <div className="relative group">
                                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => navigator.clipboard.writeText(generatedCode)}
                                                                     className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
                                                                 >
@@ -1103,7 +1102,7 @@ export default function LoadConfig({
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Groups Sidebar Column */}
                                             <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
                                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Target_Boundary_Group</span>
@@ -1112,11 +1111,10 @@ export default function LoadConfig({
                                                         <button
                                                             key={g}
                                                             onClick={() => updateItem(selected.id, 'group', g)}
-                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
-                                                                selected.group === g
-                                                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                            }`}
+                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${selected.group === g
+                                                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                                }`}
                                                         >
                                                             {g}
                                                         </button>
@@ -1142,17 +1140,17 @@ export default function LoadConfig({
                                                         />
                                                     ))}
                                                 </div>
-                                                
+
                                                 {/* Advanced Parameters */}
                                                 <AdvancedParams
                                                     loadType={selected.type}
                                                     params={selected.optionalParams || {}}
                                                     onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
                                                 />
-                                                
+
                                                 {/* Aster Command Preview */}
                                                 <div className="border-t border-slate-800 mt-8">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                                     >
@@ -1162,11 +1160,11 @@ export default function LoadConfig({
                                                         </div>
                                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                                     </button>
-                                                    
+
                                                     {isCodeOpen && (
                                                         <div className="relative group">
                                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => navigator.clipboard.writeText(generatedCode)}
                                                                     className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
                                                                 >
@@ -1180,7 +1178,7 @@ export default function LoadConfig({
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Groups Sidebar Column */}
                                             <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
                                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Target_Surface_Group</span>
@@ -1189,11 +1187,10 @@ export default function LoadConfig({
                                                         <button
                                                             key={g}
                                                             onClick={() => updateItem(selected.id, 'group', g)}
-                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
-                                                                selected.group === g
-                                                                    ? 'bg-purple-500/20 border-purple-500 text-purple-300'
-                                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                            }`}
+                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${selected.group === g
+                                                                ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                                }`}
                                                         >
                                                             {g}
                                                         </button>
@@ -1240,17 +1237,17 @@ export default function LoadConfig({
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {/* Advanced Parameters */}
                                                 <AdvancedParams
                                                     loadType={selected.type}
                                                     params={selected.optionalParams || {}}
                                                     onChange={(param, value) => updateOptionalParam(selected.id, param, value)}
                                                 />
-                                                
+
                                                 {/* Aster Command Preview */}
                                                 <div className="border-t border-slate-800 mt-8">
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsCodeOpen(!isCodeOpen)}
                                                         className="w-full flex items-center justify-between py-3 hover:bg-slate-900 transition-colors"
                                                     >
@@ -1260,11 +1257,11 @@ export default function LoadConfig({
                                                         </div>
                                                         {isCodeOpen ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
                                                     </button>
-                                                    
+
                                                     {isCodeOpen && (
                                                         <div className="relative group">
                                                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => navigator.clipboard.writeText(generatedCode)}
                                                                     className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-white"
                                                                 >
@@ -1278,7 +1275,7 @@ export default function LoadConfig({
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Groups Sidebar Column */}
                                             <div className="w-48 shrink-0 bg-slate-900/30 border border-slate-800 rounded p-4">
                                                 <span className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-3">Target_Edge_Group</span>
@@ -1287,11 +1284,10 @@ export default function LoadConfig({
                                                         <button
                                                             key={g}
                                                             onClick={() => updateItem(selected.id, 'group', g)}
-                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${
-                                                                selected.group === g
-                                                                    ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
-                                                            }`}
+                                                            className={`w-full px-3 py-2 text-[9px] font-mono border transition-all text-left ${selected.group === g
+                                                                ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white'
+                                                                }`}
                                                         >
                                                             {g}
                                                         </button>
@@ -1317,7 +1313,7 @@ export default function LoadConfig({
                                                 </div>
                                             </div>
                                         )}
-                                        
+
                                         {validationResult.warnings.length > 0 && (
                                             <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-200">
                                                 <AlertTriangle className="w-5 h-5 shrink-0" />
@@ -1343,7 +1339,7 @@ export default function LoadConfig({
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 {!selected.applyToWholeModel && !selected.group && selected.type === 'gravity' && (
                                     <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/20 rounded text-orange-200">
                                         <AlertTriangle className="w-5 h-5 shrink-0" />

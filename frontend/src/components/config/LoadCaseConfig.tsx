@@ -24,6 +24,7 @@ interface LoadCaseConfigProps {
     availableGroups?: string[]
     initialLoadCases?: any[]
     onUpdate?: (cases: any[]) => void
+    onCommandsUpdate?: (cases: any[]) => void
 }
 
 export default function LoadCaseConfig({
@@ -32,7 +33,8 @@ export default function LoadCaseConfig({
     availableRestrictions = [],
     availableGroups = [],
     initialLoadCases = [],
-    onUpdate
+    onUpdate,
+    onCommandsUpdate
 }: LoadCaseConfigProps) {
     const isFirstRender = useRef(true)
     const [cases, setCases] = useState<LoadCase[]>([])
@@ -70,14 +72,21 @@ export default function LoadCaseConfig({
             return
         }
 
+        const formattedCases = cases.map(c => ({
+            id: c.id,
+            name: String(c.name || ''),
+            loads: c.loads,
+            restrictions: c.restrictions
+        }))
+
         if (onUpdate && projectPath === lastInitializedPath.current) {
-            onUpdate(cases.map(c => ({
-                name: String(c.name || ''),
-                loads: c.loads,
-                restrictions: c.restrictions
-            })))
+            onUpdate(formattedCases)
         }
-    }, [cases, onUpdate, projectPath])
+
+        if (onCommandsUpdate && projectPath === lastInitializedPath.current) {
+            onCommandsUpdate(formattedCases)
+        }
+    }, [cases, onUpdate, onCommandsUpdate, projectPath])
 
     const addCase = () => {
         const newId = (cases.length + 1).toString()

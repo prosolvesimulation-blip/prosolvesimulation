@@ -1,210 +1,344 @@
 [
   {
-    "application": "MECANIQUE",
-    "label": "Mechanical / Structural",
-    "models": {
-      "0D": [
-        { "value": "DIS_TR", "label": "Discrete Translation (3D)", "category": "Discrete" },
-        { "value": "DIS_T", "label": "Discrete Thermal (3D)", "category": "Discrete" },
-        { "value": "2D_DIS_TR", "label": "Discrete Translation (2D)", "category": "Discrete" },
-        { "value": "2D_DIS_T", "label": "Discrete Thermal (2D)", "category": "Discrete" }
-      ],
-      "1D": [
-        { "value": "POU_D_E", "label": "Beam Euler (Poutre Euler)", "category": "Beams" },
-        { "value": "POU_D_T", "label": "Beam Timoshenko (Poutre Timoshenko)", "category": "Beams" },
-        { "value": "POU_D_EM", "label": "Beam Euler Multifiber", "category": "Beams" },
-        { "value": "POU_D_TGM", "label": "Beam Timoshenko Multifiber/Warping", "category": "Beams" },
-        { "value": "POU_D_SQUE", "label": "Beam Skeleton (Squelette)", "category": "Beams" },
-        { "value": "POU_D_TG", "label": "Beam Timoshenko Warping", "category": "Beams" },
-        { "value": "POU_D_T_GD", "label": "Beam Timoshenko Large Deformation", "category": "Beams" },
-        { "value": "BARRE", "label": "Bar / Truss", "category": "Bars & Cables" },
-        { "value": "2D_BARRE", "label": "Bar 2D", "category": "Bars & Cables" },
-        { "value": "CABLE", "label": "Cable", "category": "Bars & Cables" },
-        { "value": "CABLE_POULIE", "label": "Cable with Pulley", "category": "Bars & Cables" },
-        { "value": "CABLE_GAINE", "label": "Cable Sheath", "category": "Bars & Cables" },
-        { "value": "TUYAU_3M", "label": "Pipe 3 Nodes", "category": "Pipes" },
-        { "value": "TUYAU_6M", "label": "Pipe 6 Nodes", "category": "Pipes" },
-        { "value": "COQUE_AXIS", "label": "Shell Axisymmetric (Line mesh)", "category": "Shells 2D" },
-        { "value": "FLUI_STRU", "label": "Fluid-Structure Beam Interaction", "category": "FSI" },
-        { "value": "POU_FLUI_STRU", "label": "Fluid-Structure Beam", "category": "FSI" },
-        { "value": "3D_FAISCEAU", "label": "Bundle (Faisceau)", "category": "FSI" }
-      ],
-      "2D": [
-        { "value": "D_PLAN", "label": "Plane Stress (D_PLAN)", "category": "Standard Continuum" },
-        { "value": "C_PLAN", "label": "Plane Strain (C_PLAN)", "category": "Standard Continuum" },
-        { "value": "AXIS", "label": "Axisymmetric", "category": "Standard Continuum" },
-        { "value": "COQUE_3D", "label": "Shell 3D (Coque)", "category": "Shells & Plates" },
-        { "value": "DKT", "label": "Plate DKT", "category": "Shells & Plates" },
-        { "value": "DST", "label": "Plate DST", "category": "Shells & Plates" },
-        { "value": "Q4G", "label": "Plate Q4G", "category": "Shells & Plates" },
-        { "value": "DKTG", "label": "Plate DKTG", "category": "Shells & Plates" },
-        { "value": "Q4GG", "label": "Plate Q4GG", "category": "Shells & Plates" },
-        { "value": "MEMBRANE", "label": "Membrane", "category": "Shells & Plates" },
-        { "value": "COQUE_SOLIDE", "label": "Solid Shell", "category": "Shells & Plates" },
-        { "value": "GRILLE_MEMBRANE", "label": "Rebar Grid Membrane", "category": "Civil Eng." },
-        { "value": "GRILLE_EXCENTRE", "label": "Rebar Grid Eccentric", "category": "Civil Eng." },
-        { "value": "AXIS_SI", "label": "Axisymmetric Incompressible", "category": "Incompressible" },
-        { "value": "C_PLAN_SI", "label": "Plane Strain Incompressible", "category": "Incompressible" },
-        { "value": "D_PLAN_SI", "label": "Plane Stress Incompressible", "category": "Incompressible" },
-        { "value": "AXIS_INCO_UP", "label": "Axisym. Quasi-Incomp. UP", "category": "Incompressible" },
-        { "value": "D_PLAN_INCO_UP", "label": "Plane Stress Quasi-Incomp. UP", "category": "Incompressible" },
-        { "value": "AXIS_INCO_UPG", "label": "Axisym. Quasi-Incomp. UPG", "category": "Incompressible" },
-        { "value": "D_PLAN_INCO_UPG", "label": "Plane Stress Quasi-Incomp. UPG", "category": "Incompressible" },
-        { "value": "D_PLAN_HHO", "label": "Plane Stress HHO", "category": "HHO" },
-        { "value": "D_PLAN_GRAD_VARI", "label": "Gradient Damage Variation", "category": "Non-Local" },
-        { "value": "D_PLAN_GVNO", "label": "Gradient Variational Non-Local", "category": "Non-Local" },
-        { "value": "AXIS_GVNO", "label": "Axisym. Gradient Variational", "category": "Non-Local" },
-        { "value": "D_PLAN_GRAD_SIGM", "label": "Gradient Stress", "category": "Non-Local" },
-        { "value": "D_PLAN_DIL", "label": "Second Gradient (Dilatation)", "category": "Non-Local" },
-        { "value": "PLAN_JOINT", "label": "Joint (Plan)", "category": "Joints/Interfaces" },
-        { "value": "AXIS_JOINT", "label": "Joint (Axis)", "category": "Joints/Interfaces" },
-        { "value": "PLAN_JOINT_HYME", "label": "Joint Hydro-Mechanical", "category": "Joints/Interfaces" },
-        { "value": "PLAN_INTERFACE", "label": "Interface (Plan)", "category": "Joints/Interfaces" },
-        { "value": "PLAN_INTERFACE_S", "label": "Interface Stress (Plan)", "category": "Joints/Interfaces" },
-        { "value": "AXIS_INTERFACE", "label": "Interface (Axis)", "category": "Joints/Interfaces" },
-        { "value": "AXIS_INTERFACE_S", "label": "Interface Stress (Axis)", "category": "Joints/Interfaces" },
-        { "value": "3D_ABSO", "label": "Absorbing Boundary 3D", "category": "Acoustics/FSI" },
-        { "value": "3D_FLUI_ABSO", "label": "Absorbing Boundary Fluid", "category": "Acoustics/FSI" },
-        { "value": "3D_JOINT", "label": "Joint 3D", "category": "Joints/Interfaces" },
-        { "value": "3D_JOINT_HYME", "label": "Joint 3D Hydro-Mechanical", "category": "Joints/Interfaces" },
-        { "value": "3D_INTERFACE", "label": "Interface 3D", "category": "Joints/Interfaces" },
-        { "value": "3D_INTERFACE_S", "label": "Interface 3D Stress", "category": "Joints/Interfaces" },
-        { "value": "AXIS_HH2MD", "label": "THM Axis HH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HH2MS", "label": "THM Axis HH2MS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HHMD", "label": "THM Axis HHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HHMS", "label": "THM Axis HHMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HHM", "label": "THM Axis HHM", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HMD", "label": "THM Axis HMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HMS", "label": "THM Axis HMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HM", "label": "THM Axis HM", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THH2D", "label": "THM Axis THH2D", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THH2S", "label": "THM Axis THH2S", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THH2MD", "label": "THM Axis THH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THH2MS", "label": "THM Axis THH2MS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THHD", "label": "THM Axis THHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THHS", "label": "THM Axis THHS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THHMD", "label": "THM Axis THHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THHMS", "label": "THM Axis THHMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THMD", "label": "THM Axis THMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THMS", "label": "THM Axis THMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_THM", "label": "THM Axis THM", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HHD", "label": "THM Axis HHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_HHS", "label": "THM Axis HHS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2MD", "label": "THM Plan HH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2MS", "label": "THM Plan HH2MS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HHMD", "label": "THM Plan HHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HHMS", "label": "THM Plan HHMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HHM", "label": "THM Plan HHM", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HMD", "label": "THM Plan HMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HMS", "label": "THM Plan HMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HM", "label": "THM Plan HM", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THH2D", "label": "THM Plan THH2D", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THH2S", "label": "THM Plan THH2S", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THH2MD", "label": "THM Plan THH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THH2MS", "label": "THM Plan THH2MS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THHD", "label": "THM Plan THHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THHS", "label": "THM Plan THHS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THHMD", "label": "THM Plan THHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THHMS", "label": "THM Plan THHMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THMD", "label": "THM Plan THMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THMS", "label": "THM Plan THMS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THM", "label": "THM Plan THM", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HHD", "label": "THM Plan HHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HHS", "label": "THM Plan HHS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HS", "label": "THM Plan HS", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2D", "label": "THM Plan HH2D", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2S", "label": "THM Plan HH2S", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HMS_DIL", "label": "THM Plan HMS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HM_SI_DIL", "label": "THM Plan HM SI DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_THMS_DIL", "label": "THM Plan THMS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2MS_DIL", "label": "THM Plan HH2MS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "D_PLAN_HH2SUDA", "label": "THM Plan Unsaturated Hydraulic", "category": "Thermo-Hydro-Mech" },
-        { "value": "AXIS_JHMS", "label": "Joint Hydromechanical Axis", "category": "Joints/Interfaces" },
-        { "value": "PLAN_JHMS", "label": "Joint Hydromechanical Plan", "category": "Joints/Interfaces" }
-      ],
-      "3D": [
-        { "value": "3D", "label": "3D Solid (Standard)", "category": "Standard Continuum" },
-        { "value": "3D_SI", "label": "3D Incompressible", "category": "Incompressible" },
-        { "value": "3D_INCO_UP", "label": "3D Quasi-Incomp. UP", "category": "Incompressible" },
-        { "value": "3D_INCO_UPG", "label": "3D Quasi-Incomp. UPG", "category": "Incompressible" },
-        { "value": "3D_INCO_UPO", "label": "3D Quasi-Incomp. UPO", "category": "Incompressible" },
-        { "value": "3D_HHO", "label": "3D HHO", "category": "HHO" },
-        { "value": "3D_FLUIDE", "label": "3D Fluid", "category": "Fluid" },
-        { "value": "3D_GRAD_VARI", "label": "3D Gradient Variation", "category": "Non-Local" },
-        { "value": "3D_GVNO", "label": "3D Gradient Variational Non-Local", "category": "Non-Local" },
-        { "value": "3D_DIL", "label": "3D Second Gradient (Dilatation)", "category": "Non-Local" },
-        { "value": "3D_HHMD", "label": "THM 3D HHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HHM", "label": "THM 3D HHM", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HMD", "label": "THM 3D HMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HM", "label": "THM 3D HM", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THHD", "label": "THM 3D THHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THHMD", "label": "THM 3D THHMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THHM", "label": "THM 3D THHM", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THMD", "label": "THM 3D THMD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THM", "label": "THM 3D THM", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THVD", "label": "THM 3D THVD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THH2MD", "label": "THM 3D THH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THH2M", "label": "THM 3D THH2M", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2MD", "label": "THM 3D HH2MD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2MS", "label": "THM 3D HH2MS", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THH2S", "label": "THM 3D THH2S", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THH2D", "label": "THM 3D THH2D", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HHD", "label": "THM 3D HHD", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HHS", "label": "THM 3D HHS", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HS", "label": "THM 3D HS", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2D", "label": "THM 3D HH2D", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2S", "label": "THM 3D HH2S", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HMS_DIL", "label": "THM 3D HMS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HM_SI_DIL", "label": "THM 3D HM SI DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_THMS_DIL", "label": "THM 3D THMS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2MS_DIL", "label": "THM 3D HH2MS DIL", "category": "Thermo-Hydro-Mech" },
-        { "value": "3D_HH2SUDA", "label": "THM 3D Unsaturated Hydraulic", "category": "Thermo-Hydro-Mech" }
-      ]
-    }
+    "dimension": "1D",
+    "description": "Linear Elements (Beams, Bars, Cables, Pipes)",
+    "phenomenes": [
+      {
+        "phenomene": "MECANIQUE",
+        "label_en": "Mechanical",
+        "modelisations": [
+          {
+            "name": "BARRE",
+            "label_en": "Bar / Truss (3D Space)",
+            "description": "Truss element (tension/compression only)",
+            "formulations": []
+          },
+          {
+            "name": "2D_BARRE",
+            "label_en": "Bar / Truss (2D Space)",
+            "description": "Truss element defined in 2D plane",
+            "formulations": []
+          },
+          {
+            "name": "CABLE",
+            "label_en": "Cable",
+            "description": "Cable without bending stiffness",
+            "formulations": []
+          },
+          {
+            "name": "CABLE_POULIE",
+            "label_en": "Cable on Pulley",
+            "description": "Cable interacting with a pulley",
+            "formulations": []
+          },
+          {
+            "name": "CABLE_GAINE",
+            "label_en": "Sheathed Cable",
+            "description": "Pre-stressed cable inside a sheath",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_E",
+            "label_en": "Euler Beam",
+            "description": "Euler-Bernoulli beam (slender sections, no shear deformation)",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_EM",
+            "label_en": "Multifiber Euler Beam",
+            "description": "Multifiber beam for non-linear analysis",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_T",
+            "label_en": "Timoshenko Beam",
+            "description": "Timoshenko beam (includes shear deformation)",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_TG",
+            "label_en": "Generalized Timoshenko",
+            "description": "Timoshenko beam with generalized properties",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_TGM",
+            "label_en": "Timoshenko (Large Rotation)",
+            "description": "Timoshenko beam for large rotations",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_T_GD",
+            "label_en": "Timoshenko (Large Deformation)",
+            "description": "Timoshenko beam for large deformations",
+            "formulations": []
+          },
+          {
+            "name": "POU_D_SQUE",
+            "label_en": "Skeleton Beam",
+            "description": "Skeleton beam for simplified modeling",
+            "formulations": []
+          },
+          {
+            "name": "TUYAU_3M",
+            "label_en": "Pipe (3 Nodes)",
+            "description": "Straight or curved pipe element",
+            "formulations": []
+          },
+          {
+            "name": "TUYAU_6M",
+            "label_en": "Pipe (6 Nodes)",
+            "description": "Higher order pipe element",
+            "formulations": []
+          },
+          {
+            "name": "FLUI_STRU",
+            "label_en": "Fluid-Structure Beam",
+            "description": "Beam coupled with fluid effects",
+            "formulations": ["U_P_PHI", "U_P", "U_PSI"]
+          },
+          {
+            "name": "POU_FLUI_STRU",
+            "label_en": "Fluid-Structure Beam (Explicit)",
+            "description": "Beam coupled with fluid effects (Explicit definition)",
+            "formulations": ["U_P_PHI", "U_P", "U_PSI"]
+          }
+        ]
+      }
+    ]
   },
   {
-    "application": "THERMIQUE",
-    "label": "Thermal",
-    "models": {
-      "1D": [
-        { "value": "COQUE_AXIS", "label": "Thermal Shell Axisymmetric (Line mesh)", "category": "Shells" },
-        { "value": "COQUE_PLAN", "label": "Thermal Shell Planar (Line mesh)", "category": "Shells" }
-      ],
-      "2D": [
-        { "value": "PLAN", "label": "Thermal Planar", "category": "Standard Continuum" },
-        { "value": "PLAN_HHO", "label": "Thermal Planar HHO", "category": "HHO" },
-        { "value": "PLAN_DIAG", "label": "Thermal Planar Diagonal", "category": "Standard Continuum" },
-        { "value": "AXIS", "label": "Thermal Axisymmetric", "category": "Standard Continuum" },
-        { "value": "AXIS_HHO", "label": "Thermal Axisymmetric HHO", "category": "HHO" },
-        { "value": "AXIS_DIAG", "label": "Thermal Axisymmetric Diagonal", "category": "Standard Continuum" },
-        { "value": "AXIS_FOURIER", "label": "Thermal Axisymmetric Fourier", "category": "Standard Continuum" },
-        { "value": "COQUE", "label": "Thermal Shell 3D", "category": "Shells" }
-      ],
-      "3D": [
-        { "value": "3D", "label": "Thermal 3D", "category": "Standard Continuum" },
-        { "value": "3D_HHO", "label": "Thermal 3D HHO", "category": "HHO" },
-        { "value": "3D_DIAG", "label": "Thermal 3D Diagonal", "category": "Standard Continuum" }
-      ]
-    }
+    "dimension": "2D",
+    "description": "Planar/Surface Elements (Plane Stress/Strain, Axisymmetric, Shells, Plates)",
+    "phenomenes": [
+      {
+        "phenomene": "ACOUSTIQUE",
+        "label_en": "Acoustics",
+        "modelisations": [
+          {
+            "name": "PLAN",
+            "label_en": "2D Acoustic Continuum",
+            "description": "2D Acoustic medium",
+            "formulations": []
+          }
+        ]
+      },
+      {
+        "phenomene": "THERMIQUE",
+        "label_en": "Thermal",
+        "modelisations": [
+          {
+            "name": "PLAN",
+            "label_en": "Planar Continuum",
+            "description": "Thermal diffusion in 2D plane",
+            "formulations": []
+          },
+          {
+            "name": "AXIS",
+            "label_en": "Axisymmetric Continuum",
+            "description": "Thermal diffusion with axial symmetry",
+            "formulations": []
+          },
+          {
+            "name": "COQUE_PLAN",
+            "label_en": "Planar Thermal Shell",
+            "description": "Thermal shell in 2D plane",
+            "formulations": []
+          },
+          {
+            "name": "COQUE_AXIS",
+            "label_en": "Axisymmetric Thermal Shell",
+            "description": "Thermal shell with axial symmetry",
+            "formulations": []
+          }
+        ]
+      },
+      {
+        "phenomene": "MECANIQUE",
+        "label_en": "Mechanical",
+        "modelisations": [
+          {
+            "name": "PLAN",
+            "label_en": "Planar Continuum",
+            "description": "Generic 2D mechanical mesh",
+            "formulations": []
+          },
+          {
+            "name": "C_PLAN",
+            "label_en": "Plane Stress",
+            "description": "Plane Stress state (thin structures)",
+            "formulations": []
+          },
+          {
+            "name": "D_PLAN",
+            "label_en": "Plane Strain",
+            "description": "Plane Strain state (thick structures)",
+            "formulations": []
+          },
+          {
+            "name": "AXIS",
+            "label_en": "Axisymmetric Continuum",
+            "description": "Structure with rotational symmetry",
+            "formulations": []
+          },
+          {
+            "name": "COQUE_3D",
+            "label_en": "3D Shell",
+            "description": "Shell element oriented in 3D space",
+            "formulations": []
+          },
+          {
+            "name": "DKT",
+            "label_en": "DKT Plate",
+            "description": "Discrete Kirchhoff Triangle (Thin Plate)",
+            "formulations": []
+          },
+          {
+            "name": "DST",
+            "label_en": "DST Plate",
+            "description": "Discrete Shear Triangle (Thick Plate)",
+            "formulations": []
+          },
+          {
+            "name": "Q4G",
+            "label_en": "Quad 4 Generalized",
+            "description": "Generalized Quadrilateral Plate",
+            "formulations": []
+          },
+          {
+            "name": "DKTG",
+            "label_en": "DKT Generalized",
+            "description": "Generalized Discrete Kirchhoff Triangle",
+            "formulations": []
+          },
+          {
+            "name": "MEMBRANE",
+            "label_en": "Membrane",
+            "description": "In-plane stiffness only (no bending)",
+            "formulations": []
+          },
+          {
+            "name": "COQUE_SOLIDE",
+            "label_en": "Solid Shell",
+            "description": "Thick shell modeled with degenerate volumes",
+            "formulations": []
+          },
+          {
+            "name": "COQUE_AXIS",
+            "label_en": "Axisymmetric Shell",
+            "description": "Shell with rotational symmetry",
+            "formulations": []
+          },
+          {
+            "name": "D_PLAN_HHO",
+            "label_en": "Plane Strain HHO",
+            "description": "Plane strain using Hybrid High Order method",
+            "formulations": ["LINEAIRE", "QUADRATIQUE"]
+          },
+          {
+            "name": "AXIS_HHO",
+            "label_en": "Axisymmetric HHO",
+            "description": "Axisymmetric using Hybrid High Order method",
+            "formulations": ["LINEAIRE", "QUADRATIQUE"]
+          },
+          {
+            "name": "2D_FLUIDE",
+            "label_en": "2D Fluid",
+            "description": "2D Fluid element",
+            "formulations": ["U_P_PHI", "U_P", "U_PSI"]
+          },
+          {
+            "name": "D_PLAN_DIL",
+            "label_en": "Second Gradient (Dilatational)",
+            "description": "Second gradient model for plane strain",
+            "formulations": ["DIL", "DIL_INCO"]
+          }
+        ]
+      }
+    ]
   },
   {
-    "application": "ACOUSTIQUE",
-    "label": "Acoustics",
-    "models": {
-      "2D": [
-        { "value": "PLAN", "label": "Acoustic Planar", "category": "Standard" },
-        { "value": "2D_FLUIDE", "label": "Acoustic Fluid 2D", "category": "Fluid-Structure" },
-        { "value": "2D_FLUI_ABSO", "label": "Acoustic Fluid Absorbing 2D", "category": "Fluid-Structure" },
-        { "value": "2D_FLUI_PESA", "label": "Acoustic Fluid Gravity 2D", "category": "Fluid-Structure" },
-        { "value": "2D_FLUI_STRU", "label": "Acoustic Fluid-Structure 2D", "category": "Fluid-Structure" },
-        { "value": "AXIS_FLUIDE", "label": "Acoustic Axisymmetric Fluid", "category": "Fluid-Structure" },
-        { "value": "AXIS_FLUI_ABSO", "label": "Acoustic Axisym. Absorbing", "category": "Fluid-Structure" },
-        { "value": "AXIS_FLUI_STRU", "label": "Acoustic Axisym. Fluid-Structure", "category": "Fluid-Structure" },
-        { "value": "D_PLAN_ABSO", "label": "Acoustic Plane Absorbing", "category": "Fluid-Structure" }
-      ],
-      "3D": [
-        { "value": "3D", "label": "Acoustic 3D", "category": "Standard" }
-      ]
-    }
+    "dimension": "3D",
+    "description": "Volumetric Elements (Solids)",
+    "phenomenes": [
+      {
+        "phenomene": "ACOUSTIQUE",
+        "label_en": "Acoustics",
+        "modelisations": [
+          {
+            "name": "3D",
+            "label_en": "3D Acoustic Continuum",
+            "description": "3D Acoustic medium",
+            "formulations": []
+          }
+        ]
+      },
+      {
+        "phenomene": "THERMIQUE",
+        "label_en": "Thermal",
+        "modelisations": [
+          {
+            "name": "3D",
+            "label_en": "3D Thermal Continuum",
+            "description": "Heat transfer in solids",
+            "formulations": []
+          },
+          {
+            "name": "3D_HHO",
+            "label_en": "3D HHO",
+            "description": "3D Thermal using Hybrid High Order method",
+            "formulations": ["LINEAIRE", "QUADRATIQUE"]
+          }
+        ]
+      },
+      {
+        "phenomene": "MECANIQUE",
+        "label_en": "Mechanical",
+        "modelisations": [
+          {
+            "name": "3D",
+            "label_en": "3D Continuum",
+            "description": "Standard Solid (Tetrahedrons, Hexahedrons, etc.)",
+            "formulations": []
+          },
+          {
+            "name": "3D_SI",
+            "label_en": "3D Mixed Stress/Disp",
+            "description": "3D Solid with mixed Stress/Displacement formulation",
+            "formulations": []
+          },
+          {
+            "name": "3D_HHO",
+            "label_en": "3D HHO",
+            "description": "3D Solid using Hybrid High Order method",
+            "formulations": ["LINEAIRE", "QUADRATIQUE"]
+          },
+          {
+            "name": "3D_INCO_UP",
+            "label_en": "3D Incompressible (U,P)",
+            "description": "3D Solid for quasi-incompressible materials",
+            "formulations": []
+          },
+          {
+            "name": "3D_FLUIDE",
+            "label_en": "3D Fluid",
+            "description": "3D Fluid element",
+            "formulations": ["U_P_PHI", "U_P", "U_PSI"]
+          },
+          {
+            "name": "3D_DIL",
+            "label_en": "3D Second Gradient",
+            "description": "3D Second gradient model",
+            "formulations": ["DIL", "DIL_INCO"]
+          },
+          {
+            "name": "3D_JOINT",
+            "label_en": "3D Joint (Interface)",
+            "description": "Volumetric joint/interface elements",
+            "formulations": []
+          }
+        ]
+      }
+    ]
   }
 ]

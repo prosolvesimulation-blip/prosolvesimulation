@@ -572,79 +572,81 @@ def save_project():
         data = request.get_json()
         folder_path = data.get('folder_path')
         project_config = data.get('config')
+        comm_content = data.get('comm_content') # NEW: Full .comm from Frontend
+        export_content = data.get('export_content') # NEW: Full .export from Frontend
         
         if not folder_path or not project_config:
             return jsonify({"status": "error", "message": "Missing path or config"}), 400
             
-        study_dir = os.path.join(os.path.dirname(BASE_DIR), "backend", "services", "jinja", "study")
         project_file = os.path.join(folder_path, "project.json")
         
         # 1. Save master project.json
         with open(project_file, 'w', encoding='utf-8') as f:
             json.dump(project_config, f, indent=4)
             
-        # 2. Simplification: No longer need to decompose into multiple JSONs
-        # unless builders are updated to read main json (already done)
-        # We only need project.json to exist in the folder_path root
-        
-        # 3. Run generate_comm.py
-        script_path = os.path.join(os.path.dirname(BASE_DIR), "backend", "services", "jinja", "generate_comm.py")
-        print(f"[SAVE] Project Path: {folder_path}")
-        print(f"[SAVE] Script Path: {script_path}")
-        
-        result = subprocess.run(
-            [sys.executable, script_path, "--project_path", folder_path],
-            capture_output=True,
-            text=True, 
-            encoding='utf-8',
-            errors='replace'
-        )
-        
-        if result.stdout: print(f"--- GENERATOR STDOUT ---\n{result.stdout}")
-        if result.stderr: print(f"--- GENERATOR STDERR ---\n{result.stderr}")
-        
-        if result.returncode != 0:
-            return jsonify({"status": "warning", "message": f"Saved, but generation failed: {result.stderr}"})
-            
+        # 2. Save .comm directly from Frontend
         sim_dir = os.path.join(folder_path, "simulation_files")
         os.makedirs(sim_dir, exist_ok=True)
         dst_comm = os.path.abspath(os.path.join(sim_dir, "calcul.comm"))
+        
+        if comm_content:
+            print(f"[SAVE] Writing Frontend-generated .comm to: {dst_comm}")
+            with open(dst_comm, 'w', encoding='utf-8') as f:
+                f.write(comm_content)
+        else:
+            # Fallback to legacy generator if no content provided
+            script_path = os.path.join(os.path.dirname(BASE_DIR), "backend", "services", "jinja", "generate_comm.py")
+            print(f"[SAVE] Running Legacy Generator: {script_path}")
+            subprocess.run(
+                [sys.executable, script_path, "--project_path", folder_path],
+                capture_output=True,
+                text=True, 
+                encoding='utf-8',
+                errors='replace'
+            )
             
         # 4. GENERATE EXPORT.EXPORT for SIMULATION
-        jinja_dir = os.path.join(BASE_DIR, "services", "jinja", "templates")
-        env = Environment(loader=FileSystemLoader(jinja_dir), trim_blocks=True, lstrip_blocks=True)
-        tpl_export = env.get_template("export.j2")
-        
-        # Prepare mesh list for export from unified config
-        mesh_data_list = project_config.get("meshes", [])
-        
-        export_mesh_objs = []
-        for i, m in enumerate(mesh_data_list):
-            # med file is strictly the filename in the same folder usually
-            full_path = os.path.abspath(os.path.join(folder_path, m["filename"]))
-            export_mesh_objs.append({
-                "path": full_path,
-                "unit": 80 + i 
-            })
-            
-        temp_working_dir = os.path.join(sim_dir, "temp")
-        os.makedirs(temp_working_dir, exist_ok=True)
-        
-        export_content = tpl_export.render(
-            temp_path=os.path.abspath(temp_working_dir),
-            comm_path=dst_comm, # Points to calcul.comm
-            meshes=export_mesh_objs,
-            message_path=os.path.abspath(os.path.join(sim_dir, "message")),
-            base_path=os.path.abspath(os.path.join(sim_dir, "base")),
-            resu_med_path=os.path.abspath(os.path.join(sim_dir, "resu.med")),
-            mass_csv_path=os.path.abspath(os.path.join(sim_dir, "mass_properties.csv")),
-            reactions_csv_path=os.path.abspath(os.path.join(sim_dir, "reactions.csv"))
-        )
         export_file = os.path.join(sim_dir, "export.export")
-        with open(export_file, "w", encoding="utf-8") as f:
-            f.write(export_content)
+
+        if export_content:
+            print(f"[SAVE] Writing Frontend-generated .export to: {export_file}")
+            with open(export_file, "w", encoding="utf-8") as f:
+                f.write(export_content)
+        else:
+            # Fallback to backend generator (Note: This still uses Unit 80 legacy logic)
+            print(f"[SAVE] Running Legacy .export Generator (Unit 80 fallback)")
+            jinja_dir = os.path.join(BASE_DIR, "services", "jinja", "templates")
+            env = Environment(loader=FileSystemLoader(jinja_dir), trim_blocks=True, lstrip_blocks=True)
+            tpl_export = env.get_template("export.j2")
             
-        return jsonify({"status": "success", "message": "Project saved, generated, and ready for simulation"})
+            # Prepare mesh list for export from unified config
+            mesh_data_list = project_config.get("meshes", [])
+            
+            export_mesh_objs = []
+            for i, m in enumerate(mesh_data_list):
+                full_path = os.path.abspath(os.path.join(folder_path, m["filename"]))
+                export_mesh_objs.append({
+                    "path": full_path,
+                    "unit": 80 + i 
+                })
+                
+            temp_working_dir = os.path.join(sim_dir, "temp")
+            os.makedirs(temp_working_dir, exist_ok=True)
+            
+            legacy_export_content = tpl_export.render(
+                temp_path=os.path.abspath(temp_working_dir),
+                comm_path=dst_comm, # Points to calcul.comm
+                meshes=export_mesh_objs,
+                message_path=os.path.abspath(os.path.join(sim_dir, "message")),
+                base_path=os.path.abspath(os.path.join(sim_dir, "base")),
+                resu_med_path=os.path.abspath(os.path.join(sim_dir, "resu.med")),
+                mass_csv_path=os.path.abspath(os.path.join(sim_dir, "mass_properties.csv")),
+                reactions_csv_path=os.path.abspath(os.path.join(sim_dir, "reactions.csv"))
+            )
+            with open(export_file, "w", encoding="utf-8") as f:
+                f.write(legacy_export_content)
+            
+        return jsonify({"status": "success", "message": "Project saved, generated from Frontend, and ready for simulation"})
         
     except Exception as e:
         import traceback

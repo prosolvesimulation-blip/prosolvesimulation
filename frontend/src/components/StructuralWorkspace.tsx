@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, FolderOpen, Save, Play, Box, Grid } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ModelConfig from './config/ModelConfig'
@@ -16,8 +16,10 @@ import ContactConfig from './config/ContactConfig'
 import ConnectionConfig from './config/ConnectionsConfig'
 import VerificationConfig from './config/VerificationConfig'
 import SummaryConfig from './config/SummaryConfig'
-import SimulationExecution from './config/SimulationExecution'
-import { modelIntelligence } from '../lib/codeAster/builders/affeModele'
+import CodeAsterPreview from './config/CodeAsterPreview'
+import { commOrchestrator } from '../lib/codeAster/orchestrator/commOrchestrator'
+import { exportOrchestrator } from '../lib/codeAster/orchestrator/exportOrchestrator'
+
 
 interface StructuralWorkspaceProps {
     onBack: () => void
@@ -27,7 +29,7 @@ interface StructuralWorkspaceProps {
 
 type Tab = 'model' | 'mesh' | 'material' | 'geometry' | 'connections' | 'contact' | 'restrictions' | 'loads' | 'loadcases' | '3d-view' | 'analysis' | 'verification' | 'results' | 'report' | 'summary' | 'simulation'
 
-interface ProjectConfig {
+export interface ProjectConfig {
     geometries: any[]
     materials: any[]
     restrictions: any[]
@@ -44,6 +46,9 @@ interface ProjectConfig {
     material_commands?: any
     load_commands?: any
     restriction_commands?: any
+    load_case_commands?: any[]
+    mesh?: any
+    model?: any
 }
 
 export default function StructuralWorkspace({
@@ -69,7 +74,9 @@ export default function StructuralWorkspace({
         model_commands: { commPreview: '', caraCommands: [] },
         material_commands: { defiCommands: [], affeCommands: [], validation: { isValid: false } },
         load_commands: { forceCommands: [], pressureCommands: [], gravityCommands: [], totalLoadName: 'CHARGE_TOTAL' },
-        restriction_commands: { ddlCommands: [], faceCommands: [], edgeCommands: [], validation: { isValid: false } }
+        restriction_commands: { ddlCommands: [], faceCommands: [], edgeCommands: [], validation: { isValid: false } },
+        load_case_commands: [],
+        mesh: {}
     })
 
     // DEBUG LOG
@@ -80,30 +87,23 @@ export default function StructuralWorkspace({
     const [simulationRunning, setSimulationRunning] = useState(false)
     const [vtkGeometries, setVtkGeometries] = useState<any[]>([])
 
-    const globalModelCommands = useMemo(() => {
-        const exportData: Array<{ group: string; type: string; phenomenon: string }> = []
 
-        Object.entries(allGroupsData || {}).forEach(([_, groups]) => {
-            Object.keys(groups || {}).forEach(groupName => {
-                exportData.push({
-                    group: groupName,
-                    type: '3D',
-                    phenomenon: 'MECANIQUE'
-                })
-            })
-        })
+    const updateModel = useCallback((modelData: any) => {
+        console.log('📨 StructuralWorkspace - updateModel called:')
+        console.log('   modelData:', modelData)
 
-        const commPreview = modelIntelligence.generateCommPreview(exportData, 'MAIL', 'MODELE')
+        setProjectConfig(prev => ({
+            ...prev,
+            model: modelData
+        }))
+    }, [])
 
-        return {
-            modeleCommands: commPreview ? [commPreview] : [],
-            caraCommands: []
-        }
-    }, [allGroupsData])
 
-    useEffect(() => {
-        setProjectConfig(prev => ({ ...prev, model_commands: globalModelCommands }))
-    }, [globalModelCommands])
+    const updateModelCommands = useCallback((modelCommands: any) => {
+        console.log('📨 StructuralWorkspace - updateModelCommands called:')
+        console.log('   modelCommands:', modelCommands)
+        setProjectConfig(prev => ({ ...prev, model_commands: modelCommands }))
+    }, [])
 
     // --- REDUNDANT: Removed to prevent overwriting of Unified Mesh Cargo (DNA + Inspeção) ---
     /*
@@ -179,11 +179,32 @@ export default function StructuralWorkspace({
         try {
             console.log("Saving project...")
 
+            // Orchestrate .comm content for direct execution
+            const orchestration = commOrchestrator.orchestrateComm(projectConfig)
+            const commContent = orchestration.fullCommFile
+
+            // Orchestrate .export content
+            const simDir = `${projectPath}/simulation_files`
+            const exportData = {
+                folderPath: projectPath,
+                commPath: `${simDir}/calcul.comm`,
+                meshes: (projectConfig.mesh_commands?.lireCommands || []).length > 0
+                    ? meshFiles.map((f, i) => ({
+                        path: `${projectPath}/${f}`,
+                        unit: 20 + i // Synchronized with MeshConfig's default
+                    }))
+                    : [],
+                simDir
+            }
+            const exportContent = exportOrchestrator.generateExportContent(exportData)
+
             const response = await fetch('/api/save_project', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     folder_path: projectPath,
+                    comm_content: commContent,
+                    export_content: exportContent, // NEW: Deliver .export content
                     config: {
                         ...projectConfig,
                         meshes: meshFiles.map(f => ({
@@ -207,23 +228,23 @@ export default function StructuralWorkspace({
 
     // Memoized update handlers
     const updateGeometries = useCallback((updatedGeos: any[]) => {
+        console.log('📨 StructuralWorkspace - updateGeometries called:')
+        console.log('   updatedGeos:', updatedGeos)
+
         setProjectConfig(prev => {
-            const currentDomains = new Set(updatedGeos.map(g => g._category).filter(Boolean))
-            const preserved = prev.geometries.filter(g => !currentDomains.has(g._category))
+            // Simplesmente substituir as geometrias para evitar conflitos
+            const newGeometries = updatedGeos
+            console.log('   new geometries:', newGeometries)
+
             return {
                 ...prev,
-                geometries: [...preserved, ...updatedGeos]
+                geometries: newGeometries
             }
         })
     }, [])
 
     const updateGeometryCommands = useCallback((geometryCommands: any) => {
         setProjectConfig(prev => ({ ...prev, geometry_commands: geometryCommands }))
-    }, [])
-
-    const updateModelCommands = useCallback((modelCommands: any) => {
-        console.log('StructuralWorkspace - Received data:', modelCommands)
-        setProjectConfig(prev => ({ ...prev, model_commands: modelCommands }))
     }, [])
 
     const updateMeshCommands = useCallback((meshCommands: any) => {
@@ -248,6 +269,12 @@ export default function StructuralWorkspace({
         console.log('📨 StructuralWorkspace - updateRestrictionCommands called:')
         console.log('   restrictionCommands:', restrictionCommands)
         setProjectConfig(prev => ({ ...prev, restriction_commands: restrictionCommands }))
+    }, [])
+
+    const updateLoadCaseCommands = useCallback((loadCaseCommands: any[]) => {
+        console.log('📨 StructuralWorkspace - updateLoadCaseCommands called:')
+        console.log('   loadCaseCommands:', loadCaseCommands)
+        setProjectConfig(prev => ({ ...prev, load_case_commands: loadCaseCommands }))
     }, [])
 
     const updateMaterials = useCallback((materials: any[]) => {
@@ -346,7 +373,7 @@ export default function StructuralWorkspace({
                                 console.log(`DEBUG: [Workspace] Group ${gName} has med_type: ${gInfo.med_type}`);
                                 groupNames.push(gName);
                                 if (gInfo.category === 'Node') nodeNames.push(gName);
-                                
+
                                 // NEW: Add full group object with all metadata
                                 fullGroupObjects.push({
                                     name: gName,
@@ -357,6 +384,7 @@ export default function StructuralWorkspace({
                         });
 
                         setAllGroupsData(allGroupsMerged);
+                        setProjectConfig(prev => ({ ...prev, mesh: allGroupsMerged }));
                         setAvailableGroups(groupNames); // Pass array of group names instead of full objects
                         setNodeGroups(Array.from(new Set(nodeNames)));
 
@@ -556,10 +584,8 @@ export default function StructuralWorkspace({
                             {activeTab === 'model' && (
                                 <ModelConfig
                                     key={projectPath}
-                                    projectPath={projectPath}
-                                    meshGroups={allGroupsData}
-                                    currentGeometries={projectConfig.geometries}
-                                    onUpdate={updateGeometries}
+                                    projectConfig={projectConfig}
+                                    onModelUpdate={updateModel}
                                     onModelCommandsUpdate={updateModelCommands}
                                 />
                             )}
@@ -619,7 +645,8 @@ export default function StructuralWorkspace({
                                 <RestrictionConfig
                                     key={projectPath}
                                     projectPath={projectPath}
-                                    availableGroups={availableGroups} // Pass all groups - filtering done inside component
+                                    availableGroups={availableGroups}
+                                    meshGroups={allGroupsData} // NEW: Pass rich metadata
                                     initialRestrictions={projectConfig.restrictions}
                                     onUpdate={updateRestrictions}
                                     onRestrictionCommandsUpdate={updateRestrictionCommands}
@@ -645,6 +672,7 @@ export default function StructuralWorkspace({
                                     availableGroups={availableGroups}
                                     initialLoadCases={projectConfig.load_cases}
                                     onUpdate={updateLoadCases}
+                                    onCommandsUpdate={updateLoadCaseCommands}
                                 />
                             )}
                             {activeTab === '3d-view' && (
@@ -691,25 +719,7 @@ export default function StructuralWorkspace({
                                 />
                             )}
                             {activeTab === 'simulation' && (
-                                <>
-                                    {console.log('🚀 StructuralWorkspace - Rendering SimulationExecution with:')}
-                                    {console.log('   projectConfig.mesh_commands:', projectConfig.mesh_commands)}
-                                    {console.log('   projectConfig.geometry_commands:', projectConfig.geometry_commands)}
-                                    {console.log('   projectConfig.material_commands:', projectConfig.material_commands)}
-                                    {console.log('   projectConfig.load_commands:', projectConfig.load_commands)}
-                                    {console.log('   projectConfig.restriction_commands:', projectConfig.restriction_commands)}
-                                    <SimulationExecution
-                                        projectPath={projectPath}
-                                        projectConfig={projectConfig}
-                                        meshCommands={projectConfig.mesh_commands}
-                                        modelCommands={projectConfig.model_commands}
-                                        materialCommands={projectConfig.material_commands}
-                                        loadCommands={projectConfig.load_commands}
-                                        restrictionCommands={projectConfig.restriction_commands}
-                                        onSimulationStart={() => setSimulationRunning(true)}
-                                        onSimulationComplete={() => setSimulationRunning(false)}
-                                    />
-                                </>
+                                <CodeAsterPreview projectConfig={projectConfig} />
                             )}
                         </div>
                     </>

@@ -1,1 +1,249 @@
-EXECUTION_CODE_ASTER_EXIT_1309=0
+setting '--memory' value to 1843.20 MB (keyword RESERVE_MEMOIRE)
+Ouverture en écriture du fichier ./vola.1
+
+<INFO> Démarrage de l'exécution.
+
+                                                                                   
+   ___         _         _       _            __      ___         _                
+  / __|___  __| |___    /_\   __| |_ ___ _ _  \ \    / (_)_ _  __| |_____ __ _____ 
+ | (__/ _ \/ _` / -_)  / _ \ (_-<  _/ -_) '_|  \ \/\/ /| | ' \/ _` / _ \ V  V (_-< 
+  \___\___/\__,_\___| /_/ \_\/__/\__\___|_|     \_/\_/ |_|_||_\__,_\___/\_/\_//__/ 
+                                                 https://code-aster-windows.com    
+                       -- CODE_ASTER -- VERSION : DÉVELOPPEMENT (unstable) --                       
+                               Version 16.7.9 modifiée le 04/04/2018                                
+                           révision 5029d61da970 - branche 'windows-v16'                            
+                                   Copyright EDF R&D 1991 - 2026                                    
+                                                                                                    
+                              Exécution du : Fri Jan 30 17:00:41 2026                               
+                                        Nom de la machine :                                         
+                                                Home                                                
+                                        Architecture : 64bit                                        
+                                     Type de processeur : AMD64                                     
+                                      Système d'exploitation :                                      
+                                     Windows-10-10.0.26100-SP0                                      
+                                 Langue des messages : pt (cp1252)                                  
+                                     Version de Python : 3.7.2                                      
+                                     Version de NumPy : 1.16.1                                      
+                                     Parallélisme MPI : inactif                                     
+                                    Parallélisme OpenMP : actif                                     
+                              Nombre de processus OpenMP utilisés : 1                               
+                               Version de la librairie HDF5 : 1.10.9                                
+                                Version de la librairie MED : 4.1.1                                 
+                                 Librairie MFront : non disponible                                  
+                               Version de la librairie MUMPS : 5.5.1                                
+                                  Librairie PETSc : non disponible                                  
+                               Version de la librairie SCOTCH : 7.0.3                               
+
+starting the execution...
+Valeur initiale du temps CPU maximum =   900 secondes
+  Valeur du temps CPU maximum passé aux
+commandes =   810 secondes
+  Réserve CPU prévue = 90 secondes
+
+Ouverture en écriture du fichier ./glob.1
+
+Ouverture en écriture du fichier ./vola.1
+
+Ouverture en lecture du fichier C:\code_aster\v2024\16.7\lib\aster/elem.1
+
+Nom de la base                          :  ELEMBASE
+     Créée avec la version                   : 
+16.07.09
+     Nombre d'enregistrements utilisés       :  45
+     Nombre d'enregistrements maximum   
+    :  512
+     Nombre d'enregistrements par fichier    :  512
+     Longueur d'enregistrement
+(octets)      :  819200
+     Nombre d'identificateurs utilisés       :  123
+     Taille maximum du
+répertoire            :  300
+     Pourcentage d'utilisation du répertoire :  41 %
+
+Ouverture en lecture du fichier C:\code_aster\v2024\16.7\lib\aster/elem.1
+
+Nom de la base                          :  ELEMBASE
+     Nombre d'enregistrements utilisés       : 
+45
+     Nombre d'enregistrements maximum        :  512
+     Nombre d'enregistrements par fichier   
+:  512
+     Longueur d'enregistrement (octets)      :  819200
+     Nombre total d'accès en lecture  
+      :  63
+     Volume des accès en lecture             :         49.22 Mo.
+     Nombre total
+d'accès en écriture        :  0
+     Volume des accès en écriture            :          0.00 Mo.
+   
+ Nombre d'identificateurs utilisés       :  123
+     Taille maximum du répertoire            :  300
+
+    Pourcentage d'utilisation du répertoire :  41 %
+
+Relecture des catalogues des éléments faite.
+
+Fin de lecture (durée  0.000000  s.) 
+
+                      Mémoire limite pour l'allocation dynamique : 2355.20 Mo                       
+                              ajouté à l'initialisation du processus :                              
+                                             271.53 Mo                                              
+                               Limite cible du processus : 2626.73 Mo                               
+                         Taille limite des fichiers d'échange : 2048.00 Go                          
+# Mémoire (Mo) :   271.53 /   264.08 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
+# Fin commande #0001   user+syst:        0.09s (syst:        0.12s, elaps:        0.00s)
+# ----------------------------------------------------------------------------------------------
+
+.. _stg1_txt15
+# ----------------------------------------------------------------------------------------------
+# Commande #0002 de fort.1, ligne 15
+beam = LIRE_MAILLAGE(FORMAT='MED',
+                     INFO=1,
+                     INFO_MED=0,
+                     NOM_MED='beam',
+                     PARTITIONNEUR='SANS',
+                     UNITE=20,
+                     VERI_MAIL=_F(APLAT=0.001,
+                                  VERIF='OUI'))
+
+
+ ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+ ║ <EXCEPTION> <MED_41>                                                                           ║
+ ║                                                                                                ║
+ ║ Erreur à la lecture du maillage.                                                               ║
+ ║                                                                                                ║
+ ║ Exception :                                                                                    ║
+ ║ Traceback (most recent call last):                                                             ║
+ ║   File                                                                                         ║
+ ║ "C:\code_aster\v2024\16.7\lib\aster\code_aster\ObjectsExt\mesh_builder.py", line 51, in        ║
+ ║ wrapper                                                                                        ║
+ ║     result = func(*args, **kwds)                                                               ║
+ ║   File                                                                                         ║
+ ║ "C:\code_aster\v2024\16.7\lib\aster\code_aster\ObjectsExt\mesh_builder.py", line 85, in        ║
+ ║ buildFromMedFile                                                                               ║
+ ║     mreader.readMedFile(filename, meshname)                                                    ║
+ ║   File                                                                                         ║
+ ║ "C:\code_aster\v2024\16.7\lib\aster\code_aster\ObjectsExt\medctoaster.py", line 117, in        ║
+ ║ readMedFile                                                                                    ║
+ ║     self.setMedCouplingMesh(medc.MEDFileUMesh(path, meshname))                                 ║
+ ║   File                                                                                         ║
+ ║ "C:\code_aster\v2024\16.7\medcoupling\lib\python3.7\site-packages\medcoupling.py", line 25094, ║
+ ║ in __init__                                                                                    ║
+ ║     this = _medcoupling.new_MEDFileUMesh(*args)                                                ║
+ ║ medcoupling.InterpKernelException:                                                             ║
+ ║  File : "fort.20" has been detected as NOT EXISTING : impossible to read anything !            ║
+ ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+# Résultat commande #0002 (LIRE_MAILLAGE): beam ('<00000001>') de type <Mesh>
+# Mémoire (Mo) :   276.94 /   276.94 /   208.39 /   184.66 (VmPeak / VmSize / Optimum / Minimum)
+# Fin commande #0002   user+syst:        0.06s (syst:        0.06s, elaps:        0.00s)
+# ----------------------------------------------------------------------------------------------
+
+Exception: Trying to close the database after an uncaught exception...
+
+
+Publishing the result of the current command LIRE_MAILLAGE...
+
+Saving objects...
+pi                       <class 'float'>
+e                        <class 'float'>
+tau                      <class 'float'>
+inf                      <class 'float'>
+nan                      <class 'float'>
+beam                     <class 'libaster.Mesh'>
+
+ ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+ ║ <I> <CATAMESS_89>                                                                              ║
+ ║                                                                                                ║
+ ║ Liste des alarmes émises lors de l'exécution du calcul.                                        ║
+ ║                                                                                                ║
+ ║     Les alarmes que vous avez                                                                  ║
+ ║ choisies d'ignorer sont précédées de (*).                                                      ║
+ ║     Nombre d'occurrences pour chacune des alarmes :                                            ║
+ ║                                                                                                ║
+ ║           aucune alarme                                                                        ║
+ ╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+ ---------------------------------------------------------------------------
+ Concepts de la base: G
+    Nom        Type                Taille (Mo)         Nombre      Nombre de
+                                                     d'objets       segments
+    TOTAL                                30.46             48            109
+  
+    00000001   MAILLAGE_SDASTER           0.00              3              3
+    &FOZERO                               0.00              2              2
+    &&_NUM_C                              0.00              1              1
+    &CATA                                30.46             42            103
+ (*) sous-objets non accessible directement
+ ---------------------------------------------------------------------------
+Nom de la base                          :  GLOBALE
+     Nombre d'enregistrements utilisés       : 
+152
+     Nombre d'enregistrements maximum        :  2684354
+     Nombre d'enregistrements par
+fichier    :  15728
+     Longueur d'enregistrement (octets)      :  819200
+     Nombre total d'accès
+en lecture         :  6
+     Volume des accès en lecture             :          4.69 Mo.
+     Nombre
+total d'accès en écriture        :  374
+     Volume des accès en écriture            :        292.19
+Mo.
+     Nombre d'identificateurs utilisés       :  129
+     Taille maximum du répertoire           
+:  2000
+     Pourcentage d'utilisation du répertoire :  6 %
+
+Nom de la base                          :  VOLATILE
+     Nombre d'enregistrements utilisés       : 
+107
+     Nombre d'enregistrements maximum        :  2684354
+     Nombre d'enregistrements par
+fichier    :  15728
+     Longueur d'enregistrement (octets)      :  819200
+     Nombre total d'accès
+en lecture         :  0
+     Volume des accès en lecture             :          0.00 Mo.
+     Nombre
+total d'accès en écriture        :  291
+     Volume des accès en écriture            :        227.34
+Mo.
+     Nombre d'identificateurs utilisés       :  25
+     Taille maximum du répertoire           
+:  2000
+     Pourcentage d'utilisation du répertoire :  1 %
+
+<I> <FIN> ARRET NORMAL DANS "FIN" PAR APPEL A "JEFINI".
+  
+ <I> <FIN> MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :                     184.66 Mo
+ <I> <FIN> MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :                     208.39 Mo
+ <I> <FIN> MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS LORS DE L'EXECUTION :     277.78 Mo
+  
+ <I>       FERMETURE DES BASES EFFECTUEE
+  
+   STATISTIQUES CONCERNANT L'ALLOCATION DYNAMIQUE :
+     TAILLE CUMULEE MAXIMUM            :                  208  Mo.
+     TAILLE CUMULEE LIBEREE            :                   26  Mo.
+     NOMBRE TOTAL D'ALLOCATIONS        :                  427
+     NOMBRE TOTAL DE LIBERATIONS       :                  407
+     APPELS AU MECANISME DE LIBERATION :                    0
+     TAILLE MEMOIRE CUMULEE RECUPEREE  :                    0  Mo.
+     VOLUME DES LECTURES               :                    0  Mo.
+     VOLUME DES ECRITURES              :                    0  Mo.
+  
+   MEMOIRE JEVEUX MINIMALE REQUISE POUR L'EXECUTION :     184.66 Mo
+     - IMPOSE DE NOMBREUX ACCES DISQUE
+     - RALENTIT LA VITESSE D'EXECUTION
+   MEMOIRE JEVEUX OPTIMALE REQUISE POUR L'EXECUTION :     208.39 Mo
+     - LIMITE LES ACCES DISQUE
+     - AMELIORE LA VITESSE D'EXECUTION
+   MAXIMUM DE MEMOIRE UTILISEE PAR LE PROCESSUS     :     277.78 Mo
+     - COMPREND LA MEMOIRE CONSOMMEE PAR  JEVEUX, 
+       LE SUPERVISEUR PYTHON, LES LIBRAIRIES EXTERNES
+  
+ <I>       FIN D'EXECUTION LE : VE-30-JANV-2026 17:00:46
+Signature of pickled file   : 150cc334ef85fe3b7b31b625b6da94bcb132d7ddce4cd5f136e582af7a46dad1
+Signature of info file      : 4fa64593b685acd5a4336c220cc5e36a616a52fd62e68e896cb1514d78d6b8b9
+Signature of Jeveux database: 171ac9f91e5d5ecb33c4c7c1354a8b8dc36dc4a0a0872472574605038e6daec5
+EXECUTION_CODE_ASTER_EXIT_158=0

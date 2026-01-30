@@ -44,7 +44,7 @@ interface GeometryCommandsResult {
 }
 
 export class GeometryIntelligence {
-    
+
     /**
      * Generate complete geometry commands for Code_Aster
      */
@@ -70,7 +70,7 @@ export class GeometryIntelligence {
      * Check if section calculation is complete for all beam geometries
      */
     isSectionCalculationComplete(geometries: Geometry[]): boolean {
-        return geometries.every(g => 
+        return geometries.every(g =>
             g._category === '2D' || (g.section_properties && Object.keys(g.section_properties).length > 0)
         )
     }
@@ -83,7 +83,7 @@ export class GeometryIntelligence {
         const warnings: string[] = []
 
         // Check for required section properties in beams
-        const beamsWithoutProperties = geometries.filter(g => 
+        const beamsWithoutProperties = geometries.filter(g =>
             g._category === '1D' && (!g.section_properties || Object.keys(g.section_properties).length === 0)
         )
 
@@ -129,7 +129,7 @@ export class GeometryIntelligence {
      */
     private generateShellCaraItem(geo: Geometry): CaraItem {
         const params = geo.section_params || {}
-        
+
         return {
             type: 'COQUE',
             group: geo.group,
@@ -154,17 +154,17 @@ export class GeometryIntelligence {
         const iz = props["Izz (Node 0,0)"] || 1.0  // Moment about Node Z
         const jx = props["Torsion J"] || 1.0
         const jg = props["Warping Iw"] || 0.0
-        
+
         // Shear area calculations
         const as_y_ca = props["Shear Area Az"] || area
         const as_z_ca = props["Shear Area Ay"] || area
         const ay = as_y_ca > 0 ? area / as_y_ca : 1.0
         const az = as_z_ca > 0 ? area / as_z_ca : 1.0
-        
+
         // Fiber distances from extents
         const ry = Math.max(Math.abs(props["Min Y"] || 0), Math.abs(props["Max Y"] || 0))
         const rz = Math.max(Math.abs(props["Min X"] || 0), Math.abs(props["Max X"] || 0))
-        
+
         // Ensure minimum values to avoid division by zero
         const final_ry = Math.max(ry, 1.0e-3)
         const final_rz = Math.max(rz, 1.0e-3)
@@ -184,34 +184,65 @@ export class GeometryIntelligence {
     private renderCaraCommands(items: CaraItem[]): string[] {
         if (items.length === 0) return []
 
-        const commands = []
+        const commands: string[] = []
         commands.push('# --- Element Characteristics ---')
         commands.push('CARA_ELEM = AFFE_CARA_ELEM(')
-        commands.push('    MODELE=MODELE,')
+        commands.push('    MODELE = MODELE,')
 
-        items.forEach(item => {
-            if (item.type === 'COQUE') {
-                commands.push(`    COQUE = _F(`)
-                commands.push(`        GROUP_MA = '${item.group}',`)
-                commands.push(`        EPAIS = ${item.epais},`)
-                commands.push(`        EXCENTREMENT = ${item.excentrement},`)
-                commands.push(`        VECTEUR = ${item.vecteur},`)
-                commands.push(`        INER_ROTA = 'OUI',`)
-                commands.push(`    ),`)
-            } else if (item.type === 'POUTRE') {
-                commands.push(`    POUTRE = _F(`)
-                commands.push(`        GROUP_MA = '${item.group}',`)
-                commands.push(`        SECTION = '${item.section}',`)
-                commands.push(`        CARA = ${item.cara},`)
-                commands.push(`        VALE = ${item.vale},`)
-                commands.push(`    ),`)
+        const coqueItems = items.filter(i => i.type === 'COQUE')
+        const poutreItems = items.filter(i => i.type === 'POUTRE')
+
+        if (coqueItems.length > 0) {
+            if (coqueItems.length === 1) {
+                commands.push('    COQUE = _F(')
+                this.renderCoqueF(coqueItems[0], commands, '        ')
+                commands.push('    ),')
+            } else {
+                commands.push('    COQUE = (')
+                coqueItems.forEach((item, idx) => {
+                    commands.push('        _F(')
+                    this.renderCoqueF(item, commands, '            ')
+                    commands.push(idx === coqueItems.length - 1 ? '        )' : '        ),')
+                })
+                commands.push('    ),')
             }
-        })
+        }
+
+        if (poutreItems.length > 0) {
+            if (poutreItems.length === 1) {
+                commands.push('    POUTRE = _F(')
+                this.renderPoutreF(poutreItems[0], commands, '        ')
+                commands.push('    ),')
+            } else {
+                commands.push('    POUTRE = (')
+                poutreItems.forEach((item, idx) => {
+                    commands.push('        _F(')
+                    this.renderPoutreF(item, commands, '            ')
+                    commands.push(idx === poutreItems.length - 1 ? '        )' : '        ),')
+                })
+                commands.push('    ),')
+            }
+        }
 
         commands.push(')')
         commands.push('')
 
         return commands
+    }
+
+    private renderCoqueF(item: CaraItem, commands: string[], indent: string) {
+        commands.push(`${indent}GROUP_MA = '${item.group}',`)
+        commands.push(`${indent}EPAIS = ${item.epais},`)
+        commands.push(`${indent}EXCENTREMENT = ${item.excentrement},`)
+        commands.push(`${indent}VECTEUR = ${item.vecteur},`)
+        commands.push(`${indent}INER_ROTA = 'OUI',`)
+    }
+
+    private renderPoutreF(item: CaraItem, commands: string[], indent: string) {
+        commands.push(`${indent}GROUP_MA = '${item.group}',`)
+        commands.push(`${indent}SECTION = '${item.section}',`)
+        commands.push(`${indent}CARA = ${item.cara},`)
+        commands.push(`${indent}VALE = ${item.vale},`)
     }
 
     /**
@@ -227,10 +258,10 @@ export class GeometryIntelligence {
     private generateSummary(geometries: Geometry[]) {
         const beams = geometries.filter(g => g._category === '1D').length
         const shells = geometries.filter(g => g._category === '2D').length
-        const beamsWithProperties = geometries.filter(g => 
+        const beamsWithProperties = geometries.filter(g =>
             g._category === '1D' && g.section_properties
         ).length
-        
+
         const missingProperties = geometries
             .filter(g => g._category === '1D' && !g.section_properties)
             .map(g => g.group)
